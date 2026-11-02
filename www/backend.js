@@ -236,12 +236,12 @@
     try {
       await sb.from(TABLE).upsert({ collection: 'users', id: s.user.id, data: { name: displayName(s.user), email: s.user.email }, updated_at: new Date().toISOString() });
     } catch (e) {}
-    sb.channel('docs-changes')
+    try { sb.channel('docs-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: TABLE }, function (p) {
         var col = (p.new && p.new.collection) || (p.old && p.old.collection);
         notify(col || null);
       })
-      .subscribe();
+      .subscribe(); } catch (e) {}
     if (!ready) { ready = true; readyResolve(); }
   }
 
