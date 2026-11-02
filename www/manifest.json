@@ -1,0 +1,11 @@
+{
+  "name": "פנקס הוצאות תחזוקה",
+  "short_name": "פנקס תחזוקה",
+  "start_url": "./",
+  "display": "standalone",
+  "dir": "rtl",
+  "lang": "he",
+  "background_color": "#F2F4F0",
+  "theme_color": "#1E5A4C",
+  "icons": [{ "src": "icon.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any" }]
+}

@@ -1,0 +1,6 @@
+{
+  "appId": "com.pinkas.tachzuka",
+  "appName": "פנקס תחזוקה",
+  "webDir": "www",
+  "android": { "allowMixedContent": false }
+}

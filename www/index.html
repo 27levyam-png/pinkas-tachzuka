@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1E5A4C">
+<link rel="icon" href="icon.png">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.png">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font-size:14px}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>פנקס הוצאות תחזוקה</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700&family=Secular+One&display=swap">
+<style>
+/* Layout: sticky ledger header with tabs, one working column (max 980px), bottom sheet for forms */
+:root{
+  --bg:#F2F4F0; --surface:#FFFFFF; --surface-2:#E8ECE6; --ink:#17201C; --muted:#5A6862; --line:#D3DAD3;
+  --accent:#1E5A4C; --accent-2:#2C7563; --accent-ink:#FFFFFF; --accent-soft:#DCEBE5;
+  --amber:#9A5A0B; --amber-bg:#F6E9D5; --ok:#2B6A36; --ok-bg:#DFEEE0; --danger:#A9362B; --danger-bg:#F6E0DD;
+  --shadow:0 1px 2px rgba(20,40,30,.06),0 8px 24px rgba(20,40,30,.08);
+  --paper:#FFFFFF; --paper-ink:#555555;
+  --f-display:"Secular One","Assistant",system-ui,sans-serif;
+  --f-body:"Assistant",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111614; --surface:#19201D; --surface-2:#222B27; --ink:#E4EBE7; --muted:#97A59E; --line:#2D3833;
+  --accent:#6BC2A8; --accent-2:#86D3BB; --accent-ink:#0C1914; --accent-soft:#1D3530;
+  --amber:#E2A453; --amber-bg:#3A2B16; --ok:#7CC489; --ok-bg:#1B3020; --danger:#E5806F; --danger-bg:#3B1E1A;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111614; --surface:#19201D; --surface-2:#222B27; --ink:#E4EBE7; --muted:#97A59E; --line:#2D3833;
+  --accent:#6BC2A8; --accent-2:#86D3BB; --accent-ink:#0C1914; --accent-soft:#1D3530;
+  --amber:#E2A453; --amber-bg:#3A2B16; --ok:#7CC489; --ok-bg:#1B3020; --danger:#E5806F; --danger-bg:#3B1E1A;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35); color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 96px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:980px;margin:0 auto;direction:rtl}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums;direction:ltr;unicode-bidi:isolate}
+
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-top:14px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand h1{font-family:var(--f-display);font-weight:400;font-size:1.6rem;margin:0;letter-spacing:.2px;text-wrap:balance}
+.brand .sub{color:var(--muted);font-size:.9rem}
+nav.tabs{display:flex;gap:4px;margin-top:10px;overflow-x:auto}
+nav.tabs button{background:none;border:0;padding:10px 14px;border-bottom:3px solid transparent;color:var(--muted);font-weight:600;cursor:pointer;white-space:nowrap}
+nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+
+.notice{margin:14px 0 0;padding:10px 14px;border-radius:8px;background:var(--surface-2);color:var(--muted);font-size:.92rem}
+.notice.warn{background:var(--amber-bg);color:var(--amber)}
+section.view{padding-top:18px;display:grid;gap:16px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+.row>*{min-width:0}
+label.fld{display:grid;gap:4px;font-size:.85rem;color:var(--muted);font-weight:600}
+input,select,textarea{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 10px;min-height:42px;width:100%}
+textarea{min-height:70px;resize:vertical}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 14px;min-height:40px;font-weight:600;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{background:var(--accent-2)}
+.btn.ghost{background:none;border-color:transparent;color:var(--accent);padding-inline:8px}
+.btn.danger{color:var(--danger)}
+.btn.armed{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn.sm{min-height:32px;padding:4px 10px;font-size:.88rem}
+.btn:disabled{opacity:.5;cursor:default}
+
+.totals{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.totals div{background:var(--surface);padding:12px 14px;display:grid;gap:2px}
+.totals span{font-size:.8rem;color:var(--muted);font-weight:600;letter-spacing:.3px}
+.totals b{font-size:1.25rem;font-weight:700}
+.totals .hl b{color:var(--accent)}
+@media (max-width:600px){.totals{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.list{display:grid;gap:8px}
+.exp{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:grid;grid-template-columns:1fr auto;gap:4px 12px;cursor:pointer}
+.exp:hover{border-color:var(--accent)}
+.exp .t{font-weight:700;min-width:0}
+.exp .m{color:var(--muted);font-size:.9rem;min-width:0}
+.exp .a{text-align:left;font-weight:700;font-size:1.1rem}
+.exp .v{text-align:left;color:var(--muted);font-size:.82rem}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;grid-column:1/-1}
+.chip{font-size:.78rem;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--surface-2);color:var(--muted)}
+.chip.cat{background:var(--accent-soft);color:var(--accent)}
+.chip.pend{background:var(--amber-bg);color:var(--amber)}
+.chip.done{background:var(--ok-bg);color:var(--ok)}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:10px;padding:28px 18px;text-align:center;color:var(--muted)}
+.empty b{display:block;color:var(--ink);font-size:1.05rem;margin-bottom:4px}
+
+.bld{display:grid;gap:8px}
+.bld-h{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding-top:6px}
+.bld-h h2{font-family:var(--f-display);font-weight:400;font-size:1.25rem;margin:0}
+.apts{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
+.apt{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:10px;align-content:start}
+.apt h3{margin:0;font-size:1.05rem;display:flex;justify-content:space-between;gap:8px}
+.apt dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:.92rem}
+.apt dt{color:var(--muted)}
+.apt dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.apt .acts{display:flex;gap:4px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:8px}
+.copy{border:0;background:none;color:var(--accent);cursor:pointer;font-size:.8rem;padding:0 4px}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:12px}
+.grid-f{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:.92rem}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+td.wrap{white-space:normal;min-width:180px}
+th{background:var(--surface-2);font-size:.8rem;color:var(--muted);letter-spacing:.3px}
+tr.grp td{background:var(--accent-soft);font-weight:700;color:var(--accent)}
+tr.tot td{font-weight:700;border-top:2px solid var(--ink)}
+
+.fab{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom,0px));left:max(18px,env(safe-area-inset-left,0px));z-index:6;box-shadow:var(--shadow);border-radius:999px;padding:12px 20px;font-size:1rem}
+
+.sheet{position:fixed;inset:0;z-index:20;background:rgba(10,20,15,.45);display:flex;align-items:flex-end;justify-content:center}
+.sheet-card{background:var(--bg);width:100%;max-width:640px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:18px max(18px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px));direction:rtl;display:grid;gap:12px}
+@media (min-width:700px){.sheet{align-items:center}.sheet-card{border-radius:16px}}
+.sheet-card h2{font-family:var(--f-display);font-weight:400;margin:0;font-size:1.35rem}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:480px){.two{grid-template-columns:1fr}}
+.calc{display:flex;gap:16px;flex-wrap:wrap;background:var(--surface-2);border-radius:8px;padding:8px 12px;font-size:.9rem;color:var(--muted)}
+.calc b{color:var(--ink)}
+.receipts{display:flex;gap:8px;flex-wrap:wrap}
+.filebtn{position:relative;overflow:hidden}
+.linkbtn{border:0;background:none;color:var(--accent);font-size:.82rem;font-weight:600;padding:2px 0;cursor:pointer;justify-self:start;text-align:right}
+.filebtn input{position:absolute;inset:0;width:100%;height:100%;min-height:0;opacity:0;cursor:pointer;padding:0;border:0;font-size:0}
+.sigbox{height:130px;width:100%;border:2px dashed var(--line);border-radius:10px;background:var(--paper);color:var(--paper-ink);display:grid;place-items:center;cursor:pointer;padding:6px}
+.sigbox img{max-height:115px}
+.sigpad{position:fixed;inset:0;z-index:35;background:var(--bg);display:flex;flex-direction:column;gap:10px;direction:rtl;padding:calc(12px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.sigpad canvas{flex:1;width:100%;min-height:0;background:var(--paper);border:2px dashed var(--line);border-radius:10px;touch-action:none;cursor:crosshair}
+.sig-top{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}.sig-top span{color:var(--muted);font-size:.9rem}
+.sig-acts{display:flex;gap:8px}
+#ir{z-index:25}
+.rc{position:relative;width:84px;height:84px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface);display:grid;place-items:center;font-size:.75rem;color:var(--muted);cursor:pointer}
+.rc img{width:100%;height:100%;object-fit:cover}
+.rc .x{position:absolute;top:2px;left:2px;background:var(--surface);border:1px solid var(--line);border-radius:999px;width:22px;height:22px;line-height:18px;font-size:.8rem;cursor:pointer}
+.foot{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap}
+.lightbox{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.85);display:grid;place-items:center;padding:20px}
+.lightbox img{max-height:90vh;border-radius:6px}
+.toast{position:fixed;bottom:calc(84px + env(safe-area-inset-bottom,0px));right:50%;transform:translateX(50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:999px;z-index:40;font-weight:600}
+.catlist{display:flex;gap:6px;flex-wrap:wrap}
+.catlist .chip{display:inline-flex;gap:6px;align-items:center;font-size:.9rem;padding:4px 10px}
+.catlist .chip button{border:0;background:none;cursor:pointer;color:var(--muted);padding:0}
+@media (prefers-reduced-motion:no-preference){.exp,.btn{transition:border-color .15s,background .15s}}
+.login{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px));direction:rtl}
+.login-card{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px;display:grid;gap:12px;box-shadow:var(--shadow)}
+.login-card h1{font-family:var(--f-display);font-weight:400;font-size:1.5rem;margin:0 0 4px;text-align:center}
+.login .notice{max-width:380px;width:100%;margin:0}
+a.btn{text-decoration:none}
+</style>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="backend.js"></script>
+</head>
+<body>
+<div class="login" id="login" hidden>
+  <form class="login-card" id="lg-form" novalidate>
+    <h1>פנקס הוצאות תחזוקה</h1>
+    <label class="fld">מייל<input type="email" id="lg-email" autocomplete="username" inputmode="email" dir="ltr"></label>
+    <label class="fld">סיסמה<input type="password" id="lg-pass" autocomplete="current-password" dir="ltr"></label>
+    <button class="btn primary" id="lg-btn">כניסה</button>
+  </form>
+  <div class="notice warn" id="lg-err" hidden></div>
+  <a class="linkbtn" id="lg-dash" target="_blank" rel="noopener">השרת לא מגיב? פתיחת ניהול השרת לשחזור (Restore)</a>
+</div>
+
+<div class="wrap" dir="rtl">
+  <header class="top">
+    <div class="brand">
+      <h1>פנקס הוצאות תחזוקה</h1>
+      <span class="sub" id="who"></span>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="exp" aria-selected="true">הוצאות</button>
+      <button role="tab" data-tab="apt" aria-selected="false">דירות ובניינים</button>
+      <button role="tab" data-tab="rep" aria-selected="false">דוחות</button>
+      <button role="tab" data-tab="set" aria-selected="false">הגדרות</button>
+    </nav>
+  </header>
+  <div id="status" class="notice">טוען נתונים…</div>
+
+  <section class="view" id="v-exp">
+    <div class="row">
+      <label class="fld" style="flex:0 1 180px">חודש<input type="month" id="e-month"></label>
+      <label class="fld" style="flex:0 1 160px">סטטוס
+        <select id="e-status"><option value="">הכל</option><option value="pending">ממתין להחזר</option><option value="refunded">הוחזר</option></select></label>
+      <label class="fld" style="flex:1 1 200px">חיפוש<input type="search" id="e-q" placeholder="בעל מקצוע, תיאור, דירה…"></label>
+    </div>
+    <div class="totals" id="e-totals"></div>
+    <div class="row" id="e-bulk"><button class="btn sm" id="e-rec">🔁 הוצאות קבועות</button></div>
+    <div class="list" id="e-list"></div>
+  </section>
+
+  <section class="view" id="v-apt" hidden>
+    <div class="row" style="justify-content:space-between">
+      <label class="fld" style="flex:1 1 220px">חיפוש<input type="search" id="a-q" placeholder="בניין, דייר, מספר מונה…"></label>
+      <button class="btn primary" id="a-add" data-w>+ דירה חדשה</button>
+    </div>
+    <div id="a-list" class="list"></div>
+  </section>
+
+  <section class="view" id="v-rep" hidden>
+    <div class="panel">
+      <div class="grid-f">
+        <label class="fld">מתאריך<input type="date" id="r-from"></label>
+        <label class="fld">עד תאריך<input type="date" id="r-to"></label>
+        <label class="fld">בניין<select id="r-bld"></select></label>
+        <label class="fld">דירה<select id="r-apt"></select></label>
+        <label class="fld">סוג הוצאה<select id="r-cat"></select></label>
+        <label class="fld">בעל מקצוע<select id="r-con"></select></label>
+        <label class="fld">סטטוס<select id="r-st"><option value="">הכל</option><option value="pending">ממתין להחזר</option><option value="refunded">הוחזר</option></select></label>
+        <label class="fld">מיון לפי
+          <select id="r-grp"><option value="category">סוג הוצאה</option><option value="apt">דירה</option><option value="building">בניין</option><option value="contractor">בעל מקצוע</option><option value="month">חודש</option><option value="none">ללא קיבוץ (לפי תאריך)</option></select></label>
+      </div>
+      <div class="row">
+        <button class="btn sm" data-range="month">החודש</button>
+        <button class="btn sm" data-range="prev">חודש קודם</button>
+        <button class="btn sm" data-range="year">השנה</button>
+        <button class="btn sm" data-range="all">כל ההיסטוריה</button>
+        <span style="flex:1"></span>
+        <button class="btn primary" id="r-print">הורדת דוח להדפסה</button>
+        <button class="btn" id="r-csv">הורדה לאקסל (CSV)</button>
+        <button class="btn" id="r-backup">גיבוי מלא (ZIP)</button>
+      </div>
+    </div>
+    <div class="totals" id="r-totals"></div>
+    <div class="tbl-wrap"><table id="r-table"></table></div>
+  </section>
+
+  <section class="view" id="v-set" hidden>
+    <div class="panel">
+      <div class="grid-f">
+        <label class="fld">שיעור מע"מ (%)<input type="number" id="s-vat" step="0.1" min="0"></label>
+        <label class="fld">שם בעל הנכסים (לכותרת הדוח)<input id="s-owner"></label>
+        <label class="fld">שם מנהל התחזוקה<input id="s-manager"></label>
+      </div>
+      <div class="fld" style="color:var(--muted);font-weight:600;font-size:.85rem">סוגי הוצאות</div>
+      <div class="catlist" id="s-cats"></div>
+      <div class="row"><input id="s-newcat" placeholder="סוג הוצאה חדש" style="flex:1 1 200px;width:auto"><button class="btn" id="s-addcat">הוספה</button></div>
+      <div><button class="btn primary" id="s-save" data-w>שמירת הגדרות</button></div>
+    </div>
+    <div class="panel">
+      <div><b style="font-size:1.05rem">גיבוי מלא</b><div style="color:var(--muted);font-size:.92rem">מוריד קובץ ZIP עם אקסל של כל ההוצאות והדירות, וכל הקבלות מסודרות בתיקיות לפי בניין ודירה, בשם סוג ההוצאה והתאריך. מומלץ פעם בחודש.</div></div>
+      <div class="row"><button class="btn primary" id="b-run">הורדת גיבוי מלא</button><span id="b-last" style="color:var(--muted);font-size:.9rem"></span></div>
+    </div>
+    <div class="panel">
+      <div><b style="font-size:1.05rem">חשבון ושרת</b><div style="color:var(--muted);font-size:.92rem" id="acc-who"></div></div>
+      <div style="color:var(--muted);font-size:.92rem">כל הנתונים והקבלות נשמרים בשרת Supabase שלך. אם האפליקציה לא נטענת אחרי תקופה בלי שימוש, השרת כנראה הושהה: לחצו על "פתיחת ניהול השרת", התחברו, ולחצו Restore project. הוספת עובד חדש נעשית שם בלשונית Authentication.</div>
+      <div class="row"><a class="btn primary" id="acc-dash" target="_blank" rel="noopener">פתיחת ניהול השרת (Supabase)</a><button class="btn" id="acc-out">התנתקות</button></div>
+    </div>
+  </section>
+</div>
+
+<button class="btn primary fab" id="fab" data-w>+ הוצאה חדשה</button>
+<div class="sheet" id="sheet" hidden><div class="sheet-card" id="sheet-card"></div></div>
+<div class="lightbox" id="lightbox" hidden></div>
+<div class="toast" id="toast" hidden></div>
+<div class="sheet" id="ir" hidden><div class="sheet-card" id="ir-card"></div></div>
+<div class="sigpad" id="sig" hidden><div class="sig-top"><b>חתימה</b><span>חתמו באצבע או בעכבר בתוך המסגרת</span></div><canvas id="sig-c"></canvas><div class="sig-acts"><button type="button" class="btn" id="sig-clear">ניקוי</button><span style="flex:1"></span><button type="button" class="btn" id="sig-cancel">ביטול</button><button type="button" class="btn primary" id="sig-ok">אישור</button></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<script>
+(function(){
+document.documentElement.setAttribute('dir','rtl');
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const r2=n=>Math.round((+n||0)*100)/100;
+const money=n=>'₪'+(+n||0).toLocaleString('he-IL',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fdate=d=>d?d.split('-').reverse().join('/'):'';
+const pad=n=>String(n).padStart(2,'0');
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
+const DEFAULT_CATS=['תיקונים קלים','הוצאות משרד','אינסטלציה','חשמל','צבע ושפכטל','מנעולנות','מיזוג אוויר','נגרות ודלתות','איטום','ניקיון','גינון','חומרים וכלים','מוצרי חשמל','תיקוני מבנה','אחר'];
+
+const S={db:null,assets:null,dl:null,user:null,uid:null,canWrite:true,
+  apts:{},exps:[],settings:{vatRate:18,categories:DEFAULT_CATS.slice(),ownerName:'',managerName:''},
+  names:{},tab:'exp',loaded:{a:false,e:false}};
+
+function toast(msg){const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>t.hidden=true,2600)}
+function setStatus(msg,warn){const s=$('#status');if(!msg){s.hidden=true;return}s.hidden=false;s.textContent=msg;s.className='notice'+(warn?' warn':'')}
+
+/* ---------- helpers ---------- */
+function calcVat(amount,mode,rate){amount=+amount||0;const r=(+rate||0)/100;
+  if(mode==='none')return{gross:r2(amount),vat:0,net:r2(amount)};
+  if(mode==='plus'){const vat=r2(amount*r);return{gross:r2(amount+vat),vat,net:r2(amount)}}
+  const net=r2(amount/(1+r));return{gross:r2(amount),vat:r2(amount-net),net}}
+function aptLabel(e){ // e: expense
+  if(e.aptId==='office')return 'הוצאות משרד';
+  if(e.aptId&&e.aptId.startsWith('bld:'))return (e.aptId.slice(4))+' · שטח משותף';
+  const a=S.apts[e.aptId];if(a)return a.building+' · דירה '+a.aptNo;
+  return e.aptLabel||'—'}
+function aptShort(e){if(e.aptId==='office')return 'משרד';if(e.aptId&&e.aptId.startsWith('bld:'))return 'שטח משותף';const a=S.apts[e.aptId];if(a)return 'דירה '+a.aptNo+(a.tenantName?' – '+a.tenantName:'');return e.aptLabel||''}
+function bldOf(e){if(e.aptId==='office')return 'משרד';if(e.aptId&&e.aptId.startsWith('bld:'))return e.aptId.slice(4);const a=S.apts[e.aptId];return a?a.building:(e.building||'')}
+function buildings(){return [...new Set(Object.values(S.apts).map(a=>a.building).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'he'))}
+function aptsSorted(){return Object.entries(S.apts).sort((x,y)=>(x[1].building||'').localeCompare(y[1].building||'','he')||String(x[1].aptNo).localeCompare(String(y[1].aptNo),'he',{numeric:true}))}
+function contractors(){return [...new Set(S.exps.map(e=>e.contractor).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'he'))}
+function sum(list){return list.reduce((t,e)=>({gross:r2(t.gross+(+e.gross||0)),vat:r2(t.vat+(+e.vat||0)),net:r2(t.net+(+e.net||0)),n:t.n+1}),{gross:0,vat:0,net:0,n:0})}
+function totalsHTML(t,extra){return `<div class="hl"><span>סה"כ כולל מע"מ</span><b class="num">${money(t.gross)}</b></div><div><span>מע"מ</span><b class="num">${money(t.vat)}</b></div><div><span>נטו (לפני מע"מ)</span><b class="num">${money(t.net)}</b></div><div><span>${extra?extra[0]:'מספר הוצאות'}</span><b class="num">${extra?extra[1]:t.n}</b></div>`}
+function nameOf(uid){return uid?(S.names[uid]||''):''}
+async function resolveNames(){if(!S.user)return;const ids=[...new Set(S.exps.flatMap(e=>[e.createdBy,e.updatedBy]).filter(Boolean))].filter(i=>!(i in S.names));
+  if(!ids.length)return;try{const ps=await S.user.profiles(ids);ids.forEach(i=>S.names[i]=(ps&&ps[i]&&ps[i].name)||'');renderExp()}catch(e){}}
+function armConfirm(btn,label,fn){btn.addEventListener('click',()=>{if(btn.classList.contains('armed')){btn.classList.remove('armed');btn.textContent=btn._orig;fn();return}
+  btn._orig=btn.textContent;btn.textContent=label;btn.classList.add('armed');setTimeout(()=>{if(btn.classList.contains('armed')){btn.classList.remove('armed');btn.textContent=btn._orig}},4000)})}
+
+/* ---------- tabs ---------- */
+function showTab(t){S.tab=t;$$('nav.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));
+  ['exp','apt','rep','set'].forEach(v=>$('#v-'+v).hidden=v!==t);$('#fab').hidden=!(t==='exp'&&S.canWrite&&S.db);
+  if(t==='rep')renderRep();if(t==='set')renderSet();if(t==='apt')renderApts();if(t==='exp')renderExp()}
+$$('nav.tabs button').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.tab)));
+
+/* ---------- expenses view ---------- */
+const nowM=()=>{const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)};
+$('#e-month').value=nowM();
+['#e-month','#e-status','#e-q'].forEach(s=>$(s).addEventListener('input',renderExp));
+function expMatches(e,q){if(!q)return true;q=q.toLowerCase();return [e.contractor,e.description,e.category,aptLabel(e),e.invoiceNo].some(v=>String(v||'').toLowerCase().includes(q))}
+function renderExp(){
+  const m=$('#e-month').value,st=$('#e-status').value,q=$('#e-q').value.trim();
+  const list=S.exps.filter(e=>(!m||String(e.date||'').startsWith(m))&&(!st||e.status===st)&&expMatches(e,q)).sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.createdAt||0)-(a.createdAt||0));
+  const t=sum(list),pend=sum(list.filter(e=>e.status!=='refunded'));
+  $('#e-totals').innerHTML=totalsHTML(t,['ממתין להחזר',`<span class="num">${money(pend.gross)}</span>`]);
+  const bulk=$('#e-bulk');[...bulk.children].forEach(c=>{if(c.id!=='e-rec')c.remove()});
+  if(S.canWrite&&pend.n&&m){const b=document.createElement('button');b.className='btn sm';b.textContent=`סימון ${pend.n} הוצאות החודש כ"הוחזר"`;bulk.appendChild(b);
+    armConfirm(b,'לאשר? לחצו שוב',async()=>{for(const e of list.filter(x=>x.status!=='refunded')){try{await S.db.doc('expenses/'+e.id).update({status:'refunded',refundedAt:today()})}catch(err){}}toast('סומן כהוחזר')})}
+  {const lb=S.settings.lastBackup,days=lb?Math.floor((Date.now()-new Date(lb).getTime())/864e5):null;
+   if(S.exps.length&&(days===null||days>31)){const n=document.createElement('button');n.className='btn sm';n.textContent=days===null?'עדיין לא בוצע גיבוי – לגיבוי מלא':'הגיבוי האחרון לפני '+days+' ימים – לגיבוי מלא';n.addEventListener('click',()=>showTab('set'));bulk.appendChild(n)}}
+  const el=$('#e-list');
+  if(!list.length){el.innerHTML=S.exps.length?`<div class="empty"><b>אין הוצאות שמתאימות לסינון</b>נסו חודש אחר או נקו את החיפוש.</div>`:`<div class="empty"><b>עדיין לא נרשמו הוצאות</b>כל הוצאה תופיע כאן עם הסכום, הדירה, בעל המקצוע והקבלה. ${Object.keys(S.apts).length?'לחצו על "+ הוצאה חדשה" כדי להתחיל.':'מומלץ להתחיל בהוספת הדירות בלשונית "דירות ובניינים".'}</div>`;return}
+  el.innerHTML=list.map(e=>`<div class="exp" data-id="${esc(e.id)}" tabindex="0">
+    <div class="t">${esc(e.description||e.category||'הוצאה')}</div><div class="a num">${money(e.gross)}</div>
+    <div class="m">${esc(aptLabel(e))} · ${esc(fdate(e.date))}${e.contractor?' · '+esc(e.contractor):''}</div><div class="v num">מע"מ ${money(e.vat)}</div>
+    <div class="chips"><span class="chip cat">${esc(e.category||'ללא סיווג')}</span><span class="chip ${e.status==='refunded'?'done':'pend'}">${e.status==='refunded'?'הוחזר':'ממתין להחזר'}</span>${e.recurringId?'<span class="chip">🔁 קבועה</span>':''}${(e.receipts||[]).length?`<span class="chip">📎 ${e.receipts.length} קבלה</span>`:''}${nameOf(e.createdBy)?`<span class="chip">נרשם ע"י ${esc(nameOf(e.createdBy))}</span>`:''}</div></div>`).join('');
+  el.querySelectorAll('.exp').forEach(c=>{const open=()=>openExpense(c.dataset.id);c.addEventListener('click',open);c.addEventListener('keydown',ev=>{if(ev.key==='Enter')open()})});
+}
+
+/* ---------- sheet ---------- */
+function openSheet(html){$('#sheet-card').innerHTML=html;$('#sheet').hidden=false;document.body.style.overflow='hidden'}
+function closeSheet(){$('#sheet').hidden=true;document.body.style.overflow=''}
+$('#sheet').addEventListener('click',e=>{if(e.target.id==='sheet')cancelExpense()});
+let draftReceipts=[],freshUploads=[];
+function aptOptions(sel){let h='<option value="">— בחרו דירה —</option>'+`<option value="office" ${sel==='office'?'selected':''}>הוצאות משרד</option>`;
+  buildings().forEach(b=>{h+=`<optgroup label="${esc(b)}"><option value="bld:${esc(b)}" ${sel==='bld:'+b?'selected':''}>${esc(b)} · שטח משותף / כללי</option>`;
+    aptsSorted().filter(([,a])=>a.building===b).forEach(([id,a])=>h+=`<option value="${esc(id)}" ${sel===id?'selected':''}>דירה ${esc(a.aptNo)}${a.tenantName?' – '+esc(a.tenantName):''}</option>`);h+='</optgroup>'});
+  if(sel&&sel!=='office'&&!sel.startsWith('bld:')&&!S.apts[sel])h+=`<option value="${esc(sel)}" selected>(דירה שנמחקה)</option>`;return h}
+function openExpense(id){
+  const e=id?S.exps.find(x=>x.id===id):null;if(id&&!e)return;
+  const ro=!S.canWrite;draftReceipts=e?(e.receipts||[]).slice():[];freshUploads=[];
+  const cats=[...new Set([...S.settings.categories.filter(c=>c!=='תיקונים קטנים'),'תיקונים קלים','הוצאות משרד'])];if(e&&e.category&&!cats.includes(e.category))cats.push(e.category);
+  openSheet(`<h2>${e?'עריכת הוצאה':'הוצאה חדשה'}</h2>
+  <form id="ef" class="list" novalidate>
+   <div class="two"><label class="fld">תאריך<input type="date" id="f-date" required value="${esc(e?e.date:today())}"></label>
+    <label class="fld">דירה<select id="f-apt" required>${aptOptions(e?e.aptId:'')}</select></label></div>
+   <div class="two"><label class="fld">סוג הוצאה<select id="f-cat">${cats.map(c=>`<option ${e&&e.category===c?'selected':''}>${esc(c)}</option>`).join('')}</select></label>
+    <label class="fld" id="w-con">מי עשה את העבודה<input id="f-con" list="f-conlist" value="${esc(e?e.contractor:'')}" placeholder="שם בעל המקצוע / החברה"><datalist id="f-conlist">${contractors().map(c=>`<option value="${esc(c)}">`).join('')}</datalist><button type="button" class="linkbtn" id="f-self">ללא בעל מקצוע</button></label></div>
+   <label class="fld" id="w-desc">מהות העבודה<input id="f-desc" value="${esc(e?e.description:'')}" placeholder="לדוגמה: החלפת ברז במטבח"></label>
+   <div class="two"><label class="fld">סכום (₪)<input type="number" id="f-amount" inputmode="decimal" step="0.01" min="0" value="${e?esc(e.amountEntered??e.gross):''}"></label>
+    <label class="fld">מע"מ<select id="f-vm"><option value="incl">הסכום כולל מע"מ</option><option value="plus">הסכום לפני מע"מ</option><option value="none">ללא מע"מ</option></select></label></div>
+   <div class="calc" id="f-calc"></div>
+   <div class="two"><label class="fld">מס' חשבונית / קבלה<input id="f-inv" value="${esc(e?e.invoiceNo:'')}"></label>
+    <label class="fld">סטטוס החזר<select id="f-st"><option value="pending">ממתין להחזר</option><option value="refunded" ${e&&e.status==='refunded'?'selected':''}>הוחזר</option></select></label></div>
+   <label class="fld">הערות<textarea id="f-notes">${esc(e?e.notes:'')}</textarea></label>
+   <div class="fld">קבלות</div>
+   <div class="receipts" id="f-rc"></div>
+   ${S.assets&&!ro?`<div class="row"><span class="btn filebtn">📎 צירוף קבלה (תמונה או PDF)<input type="file" id="f-file" accept="image/*,application/pdf" multiple aria-label="צירוף קבלה"></span><button type="button" class="btn" id="f-internal">🧾 קבלה פנימית</button></div>`:`<div class="notice" style="margin:0">${ro?'צפייה בלבד.':'צירוף קבלות זמין למי שהוזמן לדף בהרשאת עריכה.'}</div>`}
+   <div class="foot">${e&&!ro?'<button type="button" class="btn danger" id="f-del">מחיקה</button>':'<span></span>'}
+    <div class="row"><button type="button" class="btn" id="f-cancel">${ro?'סגירה':'ביטול'}</button>${ro?'':'<button type="submit" class="btn primary" id="f-save">שמירה</button>'}</div></div>
+   <div class="notice" id="f-err" hidden></div>
+   ${e&&(e.createdBy||e.updatedBy)?`<div style="color:var(--muted);font-size:.82rem">${nameOf(e.createdBy)?'נרשם ע"י '+esc(nameOf(e.createdBy)):''}${e.updatedBy&&e.updatedBy!==e.createdBy&&nameOf(e.updatedBy)?' · עודכן ע"י '+esc(nameOf(e.updatedBy)):''}</div>`:''}
+  </form>`);
+  if(e)$('#f-vm').value=e.vatMode||'incl';
+  if(ro)$$('#ef input,#ef select,#ef textarea').forEach(i=>i.disabled=true);
+  const upd=()=>{const c=calcVat($('#f-amount').value,$('#f-vm').value,S.settings.vatRate);$('#f-calc').innerHTML=`נטו: <b class="num">${money(c.net)}</b> מע"מ (${S.settings.vatRate}%): <b class="num">${money(c.vat)}</b> סה"כ: <b class="num">${money(c.gross)}</b>`};
+  $('#f-amount').addEventListener('input',upd);$('#f-vm').addEventListener('change',upd);upd();
+  renderReceipts(ro);
+  const sb=$('#f-self');if(sb)sb.addEventListener('click',ev=>{ev.preventDefault();$('#f-con').value='ללא בעל מקצוע'});
+  const mode=()=>{const office=$('#f-apt').value==='office',light=$('#f-cat').value==='תיקונים קלים';
+    $('#w-con').hidden=office||light;$('#w-desc').hidden=office;const ib2=$('#f-internal');if(ib2)ib2.hidden=office};
+  $('#f-apt').addEventListener('change',()=>{if($('#f-apt').value==='office')$('#f-cat').value='הוצאות משרד';mode()});
+  $('#f-cat').addEventListener('change',mode);mode();
+  const ib=$('#f-internal');if(ib)ib.addEventListener('click',openInternal);
+  const fi=$('#f-file');if(fi)fi.addEventListener('change',()=>uploadFiles([...fi.files]).then(()=>fi.value=''));
+  $('#f-cancel').addEventListener('click',cancelExpense);
+  if($('#f-del'))armConfirm($('#f-del'),'למחוק? לחצו שוב',async()=>{try{await S.db.doc('expenses/'+e.id).delete();for(const r of (e.receipts||[])){try{await S.assets&&S.assets.delete(r.id)}catch(x){}}closeSheet();toast('ההוצאה נמחקה')}catch(err){showErr('המחיקה נכשלה. נסו שוב.')}});
+  $('#ef').addEventListener('submit',ev=>{ev.preventDefault();saveExpense(e)});
+}
+function showErr(m){const x=$('#f-err');if(x){x.hidden=false;x.className='notice warn';x.textContent=m}}
+function renderReceipts(ro){const box=$('#f-rc');if(!box)return;
+  box.innerHTML=draftReceipts.length?draftReceipts.map((r,i)=>`<div class="rc" data-i="${i}">${r.type==='application/pdf'?'PDF':`<img data-blob="${esc(r.id)}" alt="קבלה">`}${ro?'':`<button type="button" class="x" data-x="${i}" aria-label="הסרה">✕</button>`}</div>`).join(''):'<span style="color:var(--muted);font-size:.9rem">לא צורפו קבלות</span>';
+  box.querySelectorAll('img[data-blob]').forEach(im=>S.assets.objectUrl(im.dataset.blob).then(u=>im.src=u).catch(()=>im.replaceWith(document.createTextNode('קבלה'))));
+  box.querySelectorAll('.rc').forEach(el=>el.addEventListener('click',ev=>{if(ev.target.dataset.x!==undefined){const r=draftReceipts.splice(+ev.target.dataset.x,1)[0];if(freshUploads.includes(r.id)&&S.assets){S.assets.delete(r.id).catch(()=>{})}renderReceipts(ro);return}openReceipt(draftReceipts[+el.dataset.i])}))}
+async function shrink(file){if(!file.type.startsWith('image/')||file.size<1.2e6)return file;
+  try{const bmp=await createImageBitmap(file);const sc=Math.min(1,1800/Math.max(bmp.width,bmp.height));const c=document.createElement('canvas');c.width=Math.round(bmp.width*sc);c.height=Math.round(bmp.height*sc);c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
+    return await new Promise(res=>c.toBlob(b=>res(b||file),'image/jpeg',.82))}catch(e){return file}}
+async function uploadFiles(files){const btn=$('#f-save');if(btn)btn.disabled=true;
+  for(const f of files){try{toast('מעלה קבלה…');const blob=await shrink(f);const type=blob.type||f.type||'image/jpeg';const r=await S.assets.upload(blob,{type});draftReceipts.push({id:r.id,type:r.contentType,name:f.name});freshUploads.push(r.id)}
+    catch(err){showErr(err&&err.code==='too_large'?'הקובץ גדול מדי (עד 20MB).':err&&err.code==='unsupported_type'?'סוג קובץ לא נתמך. אפשר תמונה או PDF.':'העלאת הקבלה נכשלה. נסו שוב.')}}
+  if(btn)btn.disabled=false;renderReceipts(false)}
+function cancelExpense(){if(S.assets)freshUploads.forEach(id=>S.assets.delete(id).catch(()=>{}));freshUploads=[];closeSheet()}
+async function openReceipt(r){if(!r)return;
+  if(r.type==='application/pdf'){if(!S.dl){toast('הורדה אינה זמינה בתצוגה זו');return}
+    try{const b=await S.assets.fetchBlob(r.id);await S.dl.save({filename:r.name&&r.name.endsWith('.pdf')?r.name:'קבלה.pdf',data:b})}catch(e){if(!e||e.code!=='declined')toast('לא ניתן לפתוח את הקובץ')}return}
+  const lb=$('#lightbox');lb.innerHTML='<span style="color:#fff">טוען קבלה…</span>';lb.hidden=false;S.assets.objectUrl(r.id).then(u=>{lb.innerHTML=`<img src="${u}" alt="קבלה">`}).catch(()=>{lb.innerHTML='<span style="color:#fff">לא ניתן לטעון את הקבלה</span>'})}
+$('#lightbox').addEventListener('click',()=>$('#lightbox').hidden=true);
+async function saveExpense(old){
+  const aptId=$('#f-apt').value,date=$('#f-date').value,amount=$('#f-amount').value;
+  if(!date)return showErr('נא לבחור תאריך.');if(!aptId)return showErr('נא לבחור דירה או שטח משותף.');if(!(+amount>0))return showErr('נא להזין סכום.');
+  const vm=$('#f-vm').value,c=calcVat(amount,vm,S.settings.vatRate);const a=S.apts[aptId];
+  const doc={date,aptId,building:aptId==='office'?'משרד':aptId.startsWith('bld:')?aptId.slice(4):(a?a.building:''),aptLabel:aptId==='office'?'הוצאות משרד':aptId.startsWith('bld:')?aptId.slice(4)+' · שטח משותף':(a?a.building+' · דירה '+a.aptNo:''),
+    category:$('#f-cat').value,contractor:$('#w-con').hidden?'':$('#f-con').value.trim(),description:$('#w-desc').hidden?'':$('#f-desc').value.trim(),
+    amountEntered:r2(amount),vatMode:vm,vatRate:+S.settings.vatRate,gross:c.gross,vat:c.vat,net:c.net,invoiceNo:$('#f-inv').value.trim(),
+    status:$('#f-st').value,refundedAt:$('#f-st').value==='refunded'?(old&&old.refundedAt||today()):'',notes:$('#f-notes').value.trim(),receipts:draftReceipts,
+    createdAt:old?old.createdAt||Date.now():Date.now(),createdBy:old?(old.createdBy||''):(S.uid||''),updatedAt:Date.now(),updatedBy:S.uid||''};
+  const btn=$('#f-save');btn.disabled=true;
+  try{const ref=old?S.db.doc('expenses/'+old.id):S.db.collection('expenses').doc();await ref.set(doc);
+    if(old&&S.assets){(old.receipts||[]).filter(r=>!draftReceipts.some(d=>d.id===r.id)).forEach(r=>S.assets.delete(r.id).catch(()=>{}))}
+    freshUploads=[];closeSheet();toast(old?'ההוצאה עודכנה':'ההוצאה נשמרה');if(!old){$('#e-month').value=date.slice(0,7);renderExp()}}
+  catch(err){btn.disabled=false;showErr(err&&err.code==='quota_exceeded'?'מאגר הנתונים מלא. יש למחוק הוצאות ישנות.':'השמירה נכשלה. בדקו חיבור ונסו שוב.')}}
+$('#fab').addEventListener('click',()=>openExpense(null));
+/* ---------- recurring expenses ---------- */
+S.recs={};S.loaded.r=false;let recRunning=false;
+const ymNext=ym=>{let [y,m]=ym.split('-').map(Number);m++;if(m>12){m=1;y++}return y+'-'+pad(m)};
+const dayIn=(ym,day)=>{const [y,m]=ym.split('-').map(Number);const last=new Date(y,m,0).getDate();return ym+'-'+pad(Math.min(+day||1,last))};
+async function runRecurring(){
+  if(recRunning||!S.db||!S.canWrite||!(S.loaded.a&&S.loaded.e&&S.loaded.r))return;recRunning=true;
+  try{const t=today(),cur=t.slice(0,7);let made=0;
+    for(const [id,r] of Object.entries(S.recs)){if(!r.active)continue;
+      let ym=r.lastMonth?ymNext(r.lastMonth):(r.startMonth||cur),last=r.lastMonth||'';
+      while(ym<=cur){const date=dayIn(ym,r.day);if(date>t)break;
+        const eid='rec-'+id+'-'+ym;
+        if(!S.exps.some(e=>e.id===eid)){const c=calcVat(r.amountEntered,r.vatMode,S.settings.vatRate);const a=S.apts[r.aptId];
+          await S.db.doc('expenses/'+eid).set({date,aptId:r.aptId,building:r.aptId==='office'?'משרד':r.aptId.startsWith('bld:')?r.aptId.slice(4):(a?a.building:''),
+            aptLabel:r.aptId==='office'?'הוצאות משרד':r.aptId.startsWith('bld:')?r.aptId.slice(4)+' · שטח משותף':(a?a.building+' · דירה '+a.aptNo:''),
+            category:r.category||'',contractor:r.contractor||'',description:r.description||'',amountEntered:r2(r.amountEntered),vatMode:r.vatMode||'incl',vatRate:+S.settings.vatRate,
+            gross:c.gross,vat:c.vat,net:c.net,invoiceNo:'',status:'pending',refundedAt:'',notes:r.notes||'',receipts:[],recurringId:id,
+            createdAt:Date.now(),createdBy:S.uid||'',updatedAt:Date.now(),updatedBy:S.uid||''});made++}
+        last=ym;ym=ymNext(ym)}
+      if(last&&last!==r.lastMonth){try{await S.db.doc('recurring/'+id).update({lastMonth:last})}catch(e){}}}
+    if(made)toast(made===1?'נוספה הוצאה קבועה אחת':'נוספו '+made+' הוצאות קבועות');
+  }catch(e){}finally{recRunning=false}}
+function recDesc(r){return (r.description||r.category||'הוצאה קבועה')}
+function openRecList(){
+  const list=Object.entries(S.recs).sort((x,y)=>(+x[1].day||0)-(+y[1].day||0));
+  openSheet(`<h2>הוצאות קבועות</h2>
+  <div style="color:var(--muted);font-size:.92rem">הוצאה קבועה נרשמת אוטומטית בכל חודש בתאריך שנקבע, בפעם הראשונה שמישהו פותח את הפנקס באותו יום או אחריו.</div>
+  <div class="list">${list.length?list.map(([id,r])=>`<div class="exp" data-rid="${esc(id)}" tabindex="0">
+    <div class="t">${esc(recDesc(r))}</div><div class="a num">${money(calcVat(r.amountEntered,r.vatMode,S.settings.vatRate).gross)}</div>
+    <div class="m">${esc(aptLabel({aptId:r.aptId}))} · כל ${esc(r.day)} בחודש</div><div class="v"></div>
+    <div class="chips"><span class="chip cat">${esc(r.category||'')}</span><span class="chip ${r.active?'done':'pend'}">${r.active?'פעילה':'מושהית'}</span>${r.lastMonth?`<span class="chip">נרשמה לאחרונה: ${esc(r.lastMonth.split('-').reverse().join('/'))}</span>`:''}</div></div>`).join(''):'<div class="empty"><b>אין הוצאות קבועות</b>לדוגמה: שכר ניקיון חודשי, חשבון חשמל של חדר המדרגות, אינטרנט למשרד.</div>'}</div>
+  <div class="foot"><button type="button" class="btn" id="rl-close">סגירה</button>${S.canWrite?'<button type="button" class="btn primary" id="rl-add">+ הוצאה קבועה חדשה</button>':''}</div>`);
+  $('#rl-close').addEventListener('click',closeSheet);
+  const add=$('#rl-add');if(add)add.addEventListener('click',()=>openRec(null));
+  $$('#sheet-card [data-rid]').forEach(el=>{const o=()=>S.canWrite&&openRec(el.dataset.rid);el.addEventListener('click',o);el.addEventListener('keydown',ev=>{if(ev.key==='Enter')o()})});
+}
+function openRec(id){const r=id?S.recs[id]:{active:true,day:1,vatMode:'incl',startMonth:nowM()};
+  const cats=[...new Set([...S.settings.categories.filter(c=>c!=='תיקונים קטנים'),'תיקונים קלים','הוצאות משרד'])];if(r.category&&!cats.includes(r.category))cats.push(r.category);
+  openSheet(`<h2>${id?'עריכת הוצאה קבועה':'הוצאה קבועה חדשה'}</h2><form id="rf" class="list" novalidate>
+   <label class="fld">דירה<select id="r-aptsel">${aptOptions(r.aptId||'')}</select></label>
+   <div class="two"><label class="fld">סוג הוצאה<select id="r-catsel">${cats.map(c=>`<option ${r.category===c?'selected':''}>${esc(c)}</option>`).join('')}</select></label>
+    <label class="fld" id="rw-con">מי מבצע<input id="r-con" list="f-conlist2" value="${esc(r.contractor||'')}"><datalist id="f-conlist2">${contractors().map(c=>`<option value="${esc(c)}">`).join('')}</datalist></label></div>
+   <label class="fld" id="rw-desc">מהות ההוצאה<input id="r-desc" value="${esc(r.description||'')}" placeholder="לדוגמה: ניקיון חדר מדרגות"></label>
+   <div class="two"><label class="fld">סכום (₪)<input type="number" id="r-amt" inputmode="decimal" step="0.01" min="0" value="${esc(r.amountEntered??'')}"></label>
+    <label class="fld">מע"מ<select id="r-vm"><option value="incl">הסכום כולל מע"מ</option><option value="plus">הסכום לפני מע"מ</option><option value="none">ללא מע"מ</option></select></label></div>
+   <div class="two"><label class="fld">יום בחודש<select id="r-day">${Array.from({length:31},(_,i)=>`<option value="${i+1}" ${+r.day===i+1?'selected':''}>${i+1}${i===30?' (או סוף החודש)':''}</option>`).join('')}</select></label>
+    <label class="fld">החל מחודש<input type="month" id="r-start" value="${esc(r.startMonth||nowM())}" ${r.lastMonth?'disabled':''}></label></div>
+   <label class="fld">הערות<textarea id="r-notes">${esc(r.notes||'')}</textarea></label>
+   <label style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" id="r-active" style="width:auto;min-height:0" ${r.active?'checked':''}>פעילה (תירשם אוטומטית כל חודש)</label>
+   <div class="notice warn" id="f-err" hidden></div>
+   <div class="foot">${id?'<button type="button" class="btn danger" id="r-del">מחיקה</button>':'<span></span>'}<div class="row"><button type="button" class="btn" id="r-back">חזרה</button><button class="btn primary" id="r-save">שמירה</button></div></div>
+  </form>`);
+  $('#r-vm').value=r.vatMode||'incl';
+  const mode=()=>{const office=$('#r-aptsel').value==='office',light=$('#r-catsel').value==='תיקונים קלים';$('#rw-con').hidden=office||light;$('#rw-desc').hidden=false};
+  $('#r-aptsel').addEventListener('change',()=>{if($('#r-aptsel').value==='office')$('#r-catsel').value='הוצאות משרד';mode()});$('#r-catsel').addEventListener('change',mode);mode();
+  $('#r-back').addEventListener('click',openRecList);
+  if($('#r-del'))armConfirm($('#r-del'),'למחוק? לחצו שוב',async()=>{try{await S.db.doc('recurring/'+id).delete();toast('ההוצאה הקבועה נמחקה (הוצאות שכבר נרשמו נשארות)');openRecList()}catch(e){showErr('המחיקה נכשלה.')}});
+  $('#rf').addEventListener('submit',async ev=>{ev.preventDefault();
+    const aptId=$('#r-aptsel').value,amt=$('#r-amt').value;if(!aptId)return showErr('נא לבחור דירה או הוצאות משרד.');if(!(+amt>0))return showErr('נא להזין סכום.');
+    const d={aptId,category:$('#r-catsel').value,contractor:$('#rw-con').hidden?'':$('#r-con').value.trim(),description:$('#r-desc').value.trim(),amountEntered:r2(amt),vatMode:$('#r-vm').value,
+      day:+$('#r-day').value,startMonth:r.lastMonth?(r.startMonth||nowM()):$('#r-start').value||nowM(),lastMonth:r.lastMonth||'',notes:$('#r-notes').value.trim(),active:$('#r-active').checked,updatedAt:Date.now()};
+    $('#r-save').disabled=true;try{await (id?S.db.doc('recurring/'+id):S.db.collection('recurring').doc()).set(d);toast('ההוצאה הקבועה נשמרה');openRecList()}catch(e){$('#r-save').disabled=false;showErr('השמירה נכשלה. נסו שוב.')}});
+}
+$('#e-rec').addEventListener('click',openRecList);
+
+
+
+/* ---------- internal receipt ---------- */
+let irSig=null;
+function openInternal(){
+  const aptId=$('#f-apt').value;if(!aptId)return showErr('לקבלה פנימית יש לבחור קודם דירה.');
+  const a=S.apts[aptId],common=aptId.startsWith('bld:'),office=aptId==='office';
+  const d=new Date(),no='P-'+String(d.getFullYear()).slice(2)+pad(d.getMonth()+1)+pad(d.getDate())+'-'+pad(d.getHours())+pad(d.getMinutes());
+  irSig=null;
+  $('#ir-card').innerHTML=`<h2>קבלה פנימית</h2>
+  <div class="notice" style="margin:0">הקבלה תצורף להוצאה כקובץ PDF.</div>
+  <div class="two"><label class="fld">תאריך<input type="date" id="ir-date" value="${esc($('#f-date').value||today())}"></label><label class="fld">מספר קבלה<input id="ir-no" value="${esc(no)}"></label></div>
+  <label class="fld">כתובת<input id="ir-addr" value="${esc(office?'':common?aptId.slice(4):(a?a.building:''))}"></label>
+  <div class="two"><label class="fld">דירה<input id="ir-apt" value="${esc(office?'משרד':common?'שטח משותף':(a?a.aptNo:''))}"></label><label class="fld">דייר<input id="ir-ten" value="${esc(a?a.tenantName||'':'')}"></label></div>
+  <label class="fld">מי תיקן<input id="ir-con" value="${esc($('#f-con').value)}"></label>
+  <label class="fld">מהות התקלה<textarea id="ir-desc">${esc($('#f-desc').value)}</textarea></label>
+  <label class="fld">סכום ששולם (₪)<input type="number" id="ir-amt" inputmode="decimal" step="0.01" min="0" value="${esc($('#f-amount').value)}"></label>
+  <div class="fld" style="color:var(--muted);font-weight:600;font-size:.85rem">חתימה</div>
+  <button type="button" class="sigbox" id="ir-sigbox">לחצו כאן לחתימה</button>
+  <div class="notice warn" id="ir-err" hidden></div>
+  <div class="foot"><span></span><div class="row"><button type="button" class="btn" id="ir-cancel">ביטול</button><button type="button" class="btn primary" id="ir-ok">אישור וצירוף PDF</button></div></div>`;
+  $('#ir').hidden=false;$('#ir-card').scrollTop=0;
+  $('#ir-cancel').addEventListener('click',()=>$('#ir').hidden=true);
+  $('#ir-sigbox').addEventListener('click',openSig);
+  $('#ir-ok').addEventListener('click',confirmInternal);
+}
+function irErr(m){const x=$('#ir-err');x.hidden=!m;x.textContent=m||''}
+/* signature pad */
+const sigC=$('#sig-c');let sigCtx=null,sigDrawn=false,sigDown=false;
+function openSig(){$('#sig').hidden=false;sigDrawn=false;requestAnimationFrame(()=>{const r=sigC.getBoundingClientRect(),dpr=window.devicePixelRatio||1;
+  sigC.width=Math.round(r.width*dpr);sigC.height=Math.round(r.height*dpr);sigCtx=sigC.getContext('2d');sigCtx.setTransform(dpr,0,0,dpr,0,0);
+  sigCtx.lineWidth=2.8;sigCtx.lineCap='round';sigCtx.lineJoin='round';sigCtx.strokeStyle='#10141c';sigCtx.clearRect(0,0,r.width,r.height)})}
+function sigPos(ev){const r=sigC.getBoundingClientRect();return[ev.clientX-r.left,ev.clientY-r.top]}
+sigC.addEventListener('pointerdown',ev=>{if(!sigCtx)return;ev.preventDefault();sigDown=true;try{sigC.setPointerCapture(ev.pointerId)}catch(e){}const[x,y]=sigPos(ev);sigCtx.beginPath();sigCtx.moveTo(x,y);sigCtx.lineTo(x+.1,y+.1);sigCtx.stroke();sigDrawn=true});
+sigC.addEventListener('pointermove',ev=>{if(!sigDown)return;ev.preventDefault();const[x,y]=sigPos(ev);sigCtx.lineTo(x,y);sigCtx.stroke()});
+['pointerup','pointercancel','pointerleave'].forEach(t=>sigC.addEventListener(t,()=>sigDown=false));
+$('#sig-clear').addEventListener('click',()=>{if(sigCtx){sigCtx.clearRect(0,0,sigC.width,sigC.height);sigDrawn=false}});
+$('#sig-cancel').addEventListener('click',()=>$('#sig').hidden=true);
+$('#sig-ok').addEventListener('click',()=>{if(!sigDrawn){toast('נא לחתום בתוך המסגרת');return}
+  irSig=sigC.toDataURL('image/png');$('#sig').hidden=true;const b=$('#ir-sigbox');if(b)b.innerHTML=`<img src="${irSig}" alt="חתימה">`;irErr('')});
+/* receipt PDF: draw the page on a canvas (keeps Hebrew right-to-left), wrap it in an A4 PDF */
+async function makeReceiptPdf(d){
+  try{await document.fonts.load('30px Assistant');await document.fonts.load('bold 30px Assistant')}catch(e){}
+  const W=1240,H=1754,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
+  x.fillStyle='#fff';x.fillRect(0,0,W,H);const R=W-110,L=110,F='Assistant, Arial, sans-serif';
+  const txt=(s,px,y,o={})=>{x.font=(o.b?'bold ':'')+px+'px '+F;x.fillStyle=o.c||'#111';const ascii=/^[\x00-\x7F₪,.\s]*$/.test(s);x.direction=ascii?'ltr':'rtl';x.textAlign=o.al||'right';x.fillText(s,o.x??R,y)};
+  const wrap=(s,px,maxW)=>{x.font=px+'px '+F;x.direction='rtl';const out=[];String(s||'').split('\n').forEach(par=>{let ln='';par.split(/\s+/).forEach(w=>{const t=ln?ln+' '+w:w;if(x.measureText(t).width>maxW&&ln){out.push(ln);ln=w}else ln=t});out.push(ln)});return out};
+  txt('קבלה פנימית',60,170,{b:1});
+  txt('מספר '+d.no,30,222,{c:'#555'});
+  const st=S.settings;const sub=[st.ownerName&&('עבור: '+st.ownerName),st.managerName&&('מנהל תחזוקה: '+st.managerName)].filter(Boolean).join('   ·   ');if(sub)txt(sub,28,268,{c:'#555'});
+  x.fillStyle='#1E5A4C';x.fillRect(L,300,R-L,5);
+  let y=380;const lx=R-250,maxW=lx-L-10;
+  const rows=[['תאריך',fdate(d.date)],['כתובת',d.addr],['דירה',d.apt],['דייר',d.ten],['מי תיקן',d.con],['מהות התקלה',d.desc]];
+  rows.forEach(([k,v])=>{txt(k,32,y,{b:1,c:'#444'});const lines=wrap(v||'—',34,maxW);lines.forEach((l,i)=>txt(l,34,y+i*48,{x:lx}));y+=Math.max(1,lines.length)*48+26;x.fillStyle='#ddd';x.fillRect(L,y-44,R-L,1)});
+  y+=20;x.fillStyle='#EEF4F1';x.fillRect(L,y,R-L,110);
+  txt('סכום ששולם',34,y+68,{b:1,c:'#1E5A4C',x:R-30});txt(money(d.amt),46,y+72,{b:1,al:'left',x:L+30});
+  y+=230;txt('חתימה:',32,y,{b:1,c:'#444'});
+  const bx=L,bw=R-L-180,bh=260,by=y-40;x.strokeStyle='#999';x.lineWidth=2;x.strokeRect(bx,by,bw,bh);
+  if(d.sig){const img=new Image();await new Promise((ok,no)=>{img.onload=ok;img.onerror=no;img.src=d.sig});const sc=Math.min((bw-30)/img.width,(bh-30)/img.height);const iw=img.width*sc,ih=img.height*sc;x.drawImage(img,bx+(bw-iw)/2,by+(bh-ih)/2,iw,ih)}
+  txt('מסמך פנימי לצורך החזר הוצאות. אינו חשבונית מס.',24,H-90,{c:'#777'});
+  const pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4'});pdf.addImage(c.toDataURL('image/jpeg',.9),'JPEG',0,0,210,297);return pdf.output('blob')}
+async function confirmInternal(){
+  const d={date:$('#ir-date').value,no:$('#ir-no').value.trim(),addr:$('#ir-addr').value.trim(),apt:$('#ir-apt').value.trim(),ten:$('#ir-ten').value.trim(),con:$('#ir-con').value.trim(),desc:$('#ir-desc').value.trim(),amt:r2($('#ir-amt').value),sig:irSig};
+  if(!d.date)return irErr('נא לבחור תאריך.');if(!d.con)return irErr('נא למלא מי תיקן.');if(!d.desc)return irErr('נא למלא את מהות התקלה.');if(!(d.amt>0))return irErr('נא להזין סכום.');if(!d.sig)return irErr('נא לחתום בתיבת החתימה.');
+  if(!window.jspdf||!window.jspdf.jsPDF)return irErr('רכיב יצירת ה-PDF לא נטען. רעננו את הדף ונסו שוב.');
+  if(!S.assets)return irErr('צירוף קבצים זמין רק למי שהוזמן לדף בהרשאת עריכה.');
+  const ok=$('#ir-ok');ok.disabled=true;ok.textContent='מפיק PDF…';
+  try{const blob=await makeReceiptPdf(d);const r=await S.assets.upload(blob,{type:'application/pdf'});
+    draftReceipts.push({id:r.id,type:'application/pdf',name:'קבלה פנימית '+d.no+'.pdf',internal:true});freshUploads.push(r.id);
+    $('#f-date').value=d.date;$('#f-con').value=d.con;$('#f-desc').value=d.desc;$('#f-amount').value=d.amt;$('#f-vm').value='none';if(!$('#f-inv').value)$('#f-inv').value=d.no;
+    $('#f-vm').dispatchEvent(new Event('change'));renderReceipts(false);$('#ir').hidden=true;toast('הקבלה הפנימית צורפה. לחצו "שמירה" לשמירת ההוצאה.')}
+  catch(e){ok.disabled=false;ok.textContent='אישור וצירוף PDF';irErr('יצירת הקבלה נכשלה. נסו שוב.')}}
+
+/* ---------- apartments ---------- */
+$('#a-q').addEventListener('input',renderApts);
+$('#a-add').addEventListener('click',()=>openApt(null));
+function renderApts(){
+  const q=$('#a-q').value.trim().toLowerCase(),el=$('#a-list');
+  const entries=aptsSorted().filter(([,a])=>!q||Object.values(a).some(v=>String(v||'').toLowerCase().includes(q)));
+  if(!Object.keys(S.apts).length){el.innerHTML=`<div class="empty"><b>עדיין אין דירות</b>הוסיפו כל דירה עם הבניין, פרטי הדייר, טלפונים ומספרי המונים (מים, חשמל, גז). ההוצאות ישויכו אליהן.</div>`;return}
+  if(!entries.length){el.innerHTML='<div class="empty"><b>לא נמצאו דירות</b>נסו חיפוש אחר.</div>';return}
+  const blds=[...new Set(entries.map(([,a])=>a.building))];
+  el.innerHTML=blds.map(b=>{const items=entries.filter(([,a])=>a.building===b);const t=sum(S.exps.filter(e=>bldOf(e)===b));
+    return `<div class="bld"><div class="bld-h"><h2>${esc(b||'ללא בניין')}</h2><div class="row"><span class="num" style="color:var(--muted);font-size:.9rem">${money(t.gross)} · ${t.n} הוצאות</span><button class="btn sm" data-hist-b="${esc(b)}">היסטוריית בניין</button><button class="btn sm" data-print-b="${esc(b)}">הדפסת היסטוריה</button></div></div>
+    <div class="apts">${items.map(([id,a])=>{const ta=sum(S.exps.filter(e=>e.aptId===id));const row=(k,v,c)=>v?`<dt>${k}</dt><dd>${c?`<span class="num">${esc(v)}</span><button class="copy" data-copy="${esc(v)}">העתקה</button>`:esc(v)}</dd>`:'';
+      return `<div class="apt"><h3><span>דירה ${esc(a.aptNo)}${a.floor?` <small style="color:var(--muted);font-weight:500">קומה ${esc(a.floor)}</small>`:''}</span><span class="num" style="color:var(--accent)">${money(ta.gross)}</span></h3>
+      <dl>${row('דייר',a.tenantName)}${row('טלפון',a.phone,1)}${row('טלפון נוסף',a.phone2,1)}${row('מונה מים',a.waterMeter,1)}${row('מונה חשמל',a.elecMeter,1)}${row('חוזה חשמל',a.elecContract,1)}${row('מונה גז',a.gasMeter,1)}${row('הערות',a.notes)}</dl>
+      <div class="acts">${S.canWrite?`<button class="btn ghost sm" data-edit="${esc(id)}">עריכה</button>`:''}<button class="btn ghost sm" data-hist="${esc(id)}">היסטוריה</button><button class="btn ghost sm" data-print="${esc(id)}">הדפסה</button>${S.canWrite?`<button class="btn ghost sm danger" data-del="${esc(id)}">מחיקה</button>`:''}</div></div>`}).join('')}</div></div>`}).join('');
+  el.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>openApt(b.dataset.edit)));
+  el.querySelectorAll('[data-hist]').forEach(b=>b.addEventListener('click',()=>goHist({apt:b.dataset.hist})));
+  el.querySelectorAll('[data-hist-b]').forEach(b=>b.addEventListener('click',()=>goHist({bld:b.dataset.histB})));
+  el.querySelectorAll('[data-print]').forEach(b=>b.addEventListener('click',()=>{const a=S.apts[b.dataset.print];printReport(S.exps.filter(e=>e.aptId===b.dataset.print),'היסטוריית הוצאות – '+a.building+' דירה '+a.aptNo,'כל ההיסטוריה','category')}));
+  el.querySelectorAll('[data-print-b]').forEach(b=>b.addEventListener('click',()=>printReport(S.exps.filter(e=>bldOf(e)===b.dataset.printB),'היסטוריית הוצאות – '+b.dataset.printB,'כל ההיסטוריה','apt')));
+  el.querySelectorAll('[data-del]').forEach(b=>armConfirm(b,'למחוק? לחצו שוב',async()=>{try{await S.db.doc('apartments/'+b.dataset.del).delete();toast('הדירה נמחקה (ההוצאות שלה נשמרות)')}catch(e){toast('המחיקה נכשלה')}}));
+  el.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(b.dataset.copy);toast('הועתק')}catch(e){const r=document.createRange();r.selectNodeContents(b.previousElementSibling);const s=getSelection();s.removeAllRanges();s.addRange(r)}}));
+}
+function openApt(id){const a=id?S.apts[id]:{};const f=(k,l,ph,t)=>`<label class="fld">${l}<input id="a-${k}" ${t?`inputmode="${t}"`:''} value="${esc(a[k]||'')}" placeholder="${esc(ph||'')}"></label>`;
+  openSheet(`<h2>${id?'עריכת דירה':'דירה חדשה'}</h2><form id="af" class="list" novalidate>
+  <div class="two"><label class="fld">בניין (שם או כתובת)<input id="a-building" list="a-bl" value="${esc(a.building||'')}" placeholder="לדוגמה: רחוב הרב קוק 12"><datalist id="a-bl">${buildings().map(b=>`<option value="${esc(b)}">`).join('')}</datalist></label>${f('aptNo','מספר דירה','','text')}</div>
+  <div class="two">${f('floor','קומה')}${f('tenantName','שם הדייר')}</div>
+  <div class="two">${f('phone','טלפון','','tel')}${f('phone2','טלפון נוסף','','tel')}</div>
+  <div class="two">${f('waterMeter','מספר מונה מים','','numeric')}${f('elecMeter','מספר מונה חשמל','','numeric')}</div>
+  <div class="two">${f('elecContract','מספר חוזה חברת החשמל','','numeric')}${f('gasMeter','מספר מונה גז','','numeric')}</div>
+  <label class="fld">פרטים והערות<textarea id="a-notes">${esc(a.notes||'')}</textarea></label>
+  <div class="foot"><span></span><div class="row"><button type="button" class="btn" id="a-cancel">ביטול</button><button class="btn primary" id="a-save">שמירה</button></div></div>
+  <div class="notice" id="f-err" hidden></div></form>`);
+  $('#a-cancel').addEventListener('click',closeSheet);
+  $('#af').addEventListener('submit',async ev=>{ev.preventDefault();const g=k=>$('#a-'+k).value.trim();
+    const d={building:g('building'),aptNo:g('aptNo'),floor:g('floor'),tenantName:g('tenantName'),phone:g('phone'),phone2:g('phone2'),waterMeter:g('waterMeter'),elecMeter:g('elecMeter'),elecContract:g('elecContract'),gasMeter:g('gasMeter'),notes:$('#a-notes').value.trim(),updatedAt:Date.now()};
+    if(!d.building||!d.aptNo)return showErr('נא למלא בניין ומספר דירה.');
+    $('#a-save').disabled=true;try{await (id?S.db.doc('apartments/'+id):S.db.collection('apartments').doc()).set(d);closeSheet();toast('הדירה נשמרה')}catch(e){$('#a-save').disabled=false;showErr('השמירה נכשלה. נסו שוב.')}})}
+
+/* ---------- reports ---------- */
+function setRange(k){const d=new Date(),y=d.getFullYear(),m=d.getMonth();const ymd=(Y,M,D)=>{const x=new Date(Y,M,D);return x.getFullYear()+'-'+pad(x.getMonth()+1)+'-'+pad(x.getDate())};
+  if(k==='month'){$('#r-from').value=ymd(y,m,1);$('#r-to').value=ymd(y,m+1,0)}else if(k==='prev'){$('#r-from').value=ymd(y,m-1,1);$('#r-to').value=ymd(y,m,0)}
+  else if(k==='year'){$('#r-from').value=ymd(y,0,1);$('#r-to').value=ymd(y,11,31)}else{$('#r-from').value='';$('#r-to').value=''}renderRep()}
+$$('[data-range]').forEach(b=>b.addEventListener('click',()=>setRange(b.dataset.range)));
+setRange('month');
+['#r-from','#r-to','#r-apt','#r-cat','#r-con','#r-st','#r-grp'].forEach(s=>$(s).addEventListener('change',renderRep));
+$('#r-bld').addEventListener('change',()=>{$('#r-apt').value='';renderRep()});
+function goHist(o){$('#r-from').value='';$('#r-to').value='';fillRepSelects();$('#r-bld').value=o.bld||(o.apt&&S.apts[o.apt]?S.apts[o.apt].building:'');fillRepSelects();$('#r-apt').value=o.apt||'';$('#r-grp').value=o.apt?'category':'apt';showTab('rep')}
+function fillRepSelects(){const keep=s=>$(s).value;const b=keep('#r-bld'),a=keep('#r-apt'),c=keep('#r-cat'),k=keep('#r-con');
+  $('#r-bld').innerHTML='<option value="">כל הבניינים</option>'+(S.exps.some(e=>e.aptId==='office')?'<option value="משרד">הוצאות משרד</option>':'')+buildings().map(x=>`<option>${esc(x)}</option>`).join('');$('#r-bld').value=b;
+  const bv=$('#r-bld').value;$('#r-apt').innerHTML='<option value="">כל הדירות</option>'+(bv&&bv!=='משרד'?`<option value="bld:${esc(bv)}">שטח משותף</option>`:'')+aptsSorted().filter(([,x])=>!bv||x.building===bv).map(([id,x])=>`<option value="${esc(id)}">${bv?'':esc(x.building)+' · '}דירה ${esc(x.aptNo)}</option>`).join('');$('#r-apt').value=a;
+  const cats=[...new Set([...S.settings.categories,...S.exps.map(e=>e.category).filter(Boolean)])];$('#r-cat').innerHTML='<option value="">כל הסוגים</option>'+cats.map(x=>`<option>${esc(x)}</option>`).join('');$('#r-cat').value=c;
+  $('#r-con').innerHTML='<option value="">כולם</option>'+contractors().map(x=>`<option>${esc(x)}</option>`).join('');$('#r-con').value=k}
+function repRows(){const f=$('#r-from').value,t=$('#r-to').value,b=$('#r-bld').value,a=$('#r-apt').value,c=$('#r-cat').value,k=$('#r-con').value,s=$('#r-st').value;
+  return S.exps.filter(e=>(!f||e.date>=f)&&(!t||e.date<=t)&&(!b||bldOf(e)===b)&&(!a||e.aptId===a)&&(!c||e.category===c)&&(!k||e.contractor===k)&&(!s||e.status===s)).sort((x,y)=>(x.date||'').localeCompare(y.date||''))}
+const GRP={category:e=>e.category||'ללא סיווג',apt:e=>aptLabel(e),building:e=>bldOf(e)||'—',contractor:e=>e.contractor||'לא צוין',month:e=>(e.date||'').slice(0,7).split('-').reverse().join('/'),none:()=>''};
+function grouped(rows,g){const m=new Map();rows.forEach(e=>{const k=GRP[g](e);if(!m.has(k))m.set(k,[]);m.get(k).push(e)});return [...m.entries()].sort((x,y)=>g==='month'?0:sum(y[1]).gross-sum(x[1]).gross)}
+function renderRep(){fillRepSelects();const rows=repRows(),g=$('#r-grp').value,t=sum(rows);
+  $('#r-totals').innerHTML=totalsHTML(t);
+  const head='<tr><th>תאריך</th><th>דירה</th><th>סוג</th><th>מהות העבודה</th><th>בעל מקצוע</th><th>קבלה</th><th>נטו</th><th>מע"מ</th><th>סה"כ</th><th>סטטוס</th></tr>';
+  const line=e=>`<tr><td class="num">${esc(fdate(e.date))}</td><td>${esc(aptLabel(e))}</td><td>${esc(e.category)}</td><td class="wrap">${esc(e.description)}</td><td>${esc(e.contractor)}</td><td>${(e.receipts||[]).length?'📎':''}${esc(e.invoiceNo||'')}</td><td class="num">${money(e.net)}</td><td class="num">${money(e.vat)}</td><td class="num"><b>${money(e.gross)}</b></td><td><span class="chip ${e.status==='refunded'?'done':'pend'}">${e.status==='refunded'?'הוחזר':'ממתין'}</span></td></tr>`;
+  if(!rows.length){$('#r-table').innerHTML=`<tbody><tr><td style="padding:24px;color:var(--muted);text-align:center;white-space:normal">אין הוצאות בטווח ובסינון שנבחרו.</td></tr></tbody>`;return}
+  let body='';if(g==='none')body=rows.map(line).join('');else grouped(rows,g).forEach(([k,list])=>{const s=sum(list);body+=`<tr class="grp"><td colspan="6">${esc(k)} <span style="font-weight:500">(${s.n})</span></td><td class="num">${money(s.net)}</td><td class="num">${money(s.vat)}</td><td class="num">${money(s.gross)}</td><td></td></tr>`+list.map(line).join('')});
+  $('#r-table').innerHTML=`<thead>${head}</thead><tbody>${body}<tr class="tot"><td colspan="6">סה"כ</td><td class="num">${money(t.net)}</td><td class="num">${money(t.vat)}</td><td class="num">${money(t.gross)}</td><td></td></tr></tbody>`;
+  $$('#r-table tbody tr:not(.grp):not(.tot)').forEach((tr,i)=>{});
+}
+function rangeText(){const f=$('#r-from').value,t=$('#r-to').value;return f||t?`${f?fdate(f):'התחלה'} – ${t?fdate(t):'היום'}`:'כל ההיסטוריה'}
+function filterText(){const parts=[];const b=$('#r-bld').value,a=$('#r-apt').value,c=$('#r-cat').value,k=$('#r-con').value,s=$('#r-st').value;
+  if(b)parts.push('בניין: '+b);if(a)parts.push('דירה: '+aptLabel({aptId:a}));if(c)parts.push('סוג: '+c);if(k)parts.push('בעל מקצוע: '+k);if(s)parts.push(s==='pending'?'ממתין להחזר':'הוחזר');return parts.join(' · ')}
+async function save(filename,data){if(!S.dl){toast('הורדה אינה זמינה בתצוגה זו');return}try{const sv=await S.dl.save({filename,data});toast((sv&&sv.where)||'הקובץ נשמר')}catch(e){if(e&&e.code==='declined')return;toast('לא ניתן לשמור את הקובץ כאן')}}
+function printReport(rows,title,sub,g){rows=rows.slice().sort((x,y)=>(x.date||'').localeCompare(y.date||''));const t=sum(rows),st=S.settings;
+  const line=e=>`<tr><td>${esc(fdate(e.date))}</td><td>${esc(aptLabel(e))}</td><td>${esc(e.category)}</td><td>${esc(e.description)}</td><td>${esc(e.contractor)}</td><td>${esc(e.invoiceNo||'')}</td><td class="n">${money(e.net)}</td><td class="n">${money(e.vat)}</td><td class="n"><b>${money(e.gross)}</b></td><td>${e.status==='refunded'?'הוחזר':'ממתין'}</td></tr>`;
+  let body='';if(g==='none')body=rows.map(line).join('');else grouped(rows,g).forEach(([k,list])=>{const s=sum(list);body+=`<tr class="g"><td colspan="6">${esc(k)} (${s.n})</td><td class="n">${money(s.net)}</td><td class="n">${money(s.vat)}</td><td class="n">${money(s.gross)}</td><td></td></tr>`+list.map(line).join('')});
+  const html=`<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>${esc(title)}</title><style>
+  body{font-family:Arial,"Segoe UI",sans-serif;color:#111;margin:24px;font-size:12px}h1{font-size:20px;margin:0 0 4px}.s{color:#555;margin-bottom:14px}
+  .t{display:flex;gap:28px;margin:12px 0 16px;padding:10px 14px;border:1px solid #999}.t div span{display:block;color:#555;font-size:11px}.t b{font-size:15px}
+  table{width:100%;border-collapse:collapse}th,td{border:1px solid #bbb;padding:5px 6px;text-align:right;vertical-align:top}th{background:#eee}.n{white-space:nowrap;direction:ltr;text-align:left}
+  tr.g td{background:#e3eee9;font-weight:bold}tr.f td{font-weight:bold;border-top:2px solid #000}.sig{margin-top:40px;display:flex;justify-content:space-between}
+  @media print{body{margin:10mm}button{display:none}}</style></head><body>
+  <button onclick="print()" style="float:left;padding:8px 16px">הדפסה</button>
+  <h1>${esc(title)}</h1><div class="s">${esc(sub)}${st.ownerName?' · בעלים: '+esc(st.ownerName):''}${st.managerName?' · מנהל תחזוקה: '+esc(st.managerName):''} · הופק ${esc(fdate(today()))}</div>
+  <div class="t"><div><span>סה"כ כולל מע"מ</span><b>${money(t.gross)}</b></div><div><span>מע"מ</span><b>${money(t.vat)}</b></div><div><span>נטו</span><b>${money(t.net)}</b></div><div><span>מספר הוצאות</span><b>${t.n}</b></div></div>
+  <table><thead><tr><th>תאריך</th><th>דירה</th><th>סוג</th><th>מהות העבודה</th><th>בעל מקצוע</th><th>חשבונית</th><th>נטו</th><th>מע"מ</th><th>סה"כ</th><th>סטטוס</th></tr></thead>
+  <tbody>${body||'<tr><td colspan="10">אין הוצאות</td></tr>'}<tr class="f"><td colspan="6">סה"כ</td><td class="n">${money(t.net)}</td><td class="n">${money(t.vat)}</td><td class="n">${money(t.gross)}</td><td></td></tr></tbody></table>
+  <div class="sig"><div>חתימת מנהל התחזוקה: ______________</div><div>אישור בעל הנכסים: ______________</div></div>
+  <script>window.onload=function(){setTimeout(function(){window.print()},300)}<\/script></body></html>`;
+  save(title.replace(/[\\/:*?"<>|]/g,'-')+'.html',html)}
+$('#r-print').addEventListener('click',()=>{const ft=filterText();printReport(repRows(),'דוח הוצאות תחזוקה',rangeText()+(ft?' · '+ft:''),$('#r-grp').value)});
+$('#r-csv').addEventListener('click',()=>{const rows=repRows();const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+  const lines=[['תאריך','כתובת / בניין','דירה ודייר','סוג הוצאה','מהות העבודה','בעל מקצוע','מס חשבונית','נטו','מעמ','סהכ','סטטוס','תאריך החזר','הערות'].map(q).join(',')];
+  rows.forEach(e=>lines.push([fdate(e.date),bldOf(e),aptShort(e),e.category,e.description,e.contractor,e.invoiceNo,e.net,e.vat,e.gross,e.status==='refunded'?'הוחזר':'ממתין להחזר',fdate(e.refundedAt),e.notes].map(q).join(',')));
+  save('הוצאות-תחזוקה.csv','﻿'+lines.join('\r\n'))});
+
+/* ---------- full backup (ZIP) ---------- */
+const safe=s=>String(s||'').replace(/[\\/:*?"<>|\u0000-\u001f]/g,'-').replace(/\s+/g,' ').trim().slice(0,80)||'ללא שם';
+const extOf=t=>({'application/pdf':'pdf','image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/gif':'gif'})[t]||'bin';
+const xl=v=>v?'="'+String(v).replace(/"/g,'')+'"':'';
+function csvText(header,rows){const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';return '﻿'+[header.map(q).join(','),...rows.map(r=>r.map(q).join(','))].join('\r\n')}
+function folderOf(e){if(e.aptId==='office')return 'משרד';const b=safe(bldOf(e)||'ללא בניין');
+  if(e.aptId&&e.aptId.startsWith('bld:'))return b+'/שטח משותף';const a=S.apts[e.aptId];return b+'/'+safe(a?'דירה '+a.aptNo:String(e.aptLabel||'דירה').split(' · ').pop())}
+async function runBackup(btn){
+  if(!window.JSZip){toast('רכיב הגיבוי לא נטען. רעננו את הדף.');return}
+  if(!S.dl){toast('הורדה אינה זמינה בתצוגה זו');return}
+  const orig=btn.textContent;btn.disabled=true;
+  try{
+    const zip=new JSZip(),root=zip.folder('פנקס תחזוקה '+fdate(today()).replace(/\//g,'-'));
+    const used=new Set(),missing=[],paths=new Map();
+    const exps=S.exps.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+    const all=exps.flatMap(e=>(e.receipts||[]).map(r=>({e,r})));let i=0;
+    for(const {e,r} of all){i++;btn.textContent=`מוריד קבלות ${i}/${all.length}…`;
+      const folder=folderOf(e),base=safe((e.category||'הוצאה')+' '+fdate(e.date).replace(/\//g,'-')),ext=extOf(r.type);
+      let name=base+'.'+ext,k=2;while(used.has(folder+'/'+name))name=base+' ('+(k++)+').'+ext;used.add(folder+'/'+name);
+      try{root.file(folder+'/'+name,await S.assets.fetchBlob(r.id));if(!paths.has(e.id))paths.set(e.id,[]);paths.get(e.id).push(folder+'/'+name)}
+      catch(err){missing.push(folder+'/'+name)}}
+    root.file('הוצאות.csv',csvText(['תאריך','כתובת / בניין','דירה ודייר','סוג הוצאה','מהות העבודה','בעל מקצוע','מס חשבונית','נטו','מעמ','סהכ','סטטוס','תאריך החזר','הערות','קבצי קבלות'],
+      exps.map(e=>[fdate(e.date),bldOf(e),aptShort(e),e.category,e.description,e.contractor,e.invoiceNo,e.net,e.vat,e.gross,e.status==='refunded'?'הוחזר':'ממתין להחזר',fdate(e.refundedAt),e.notes,(paths.get(e.id)||[]).join(' | ')])));
+    root.file('דירות.csv',csvText(['בניין','דירה','קומה','דייר','טלפון','טלפון נוסף','מונה מים','מונה חשמל','חוזה חשמל','מונה גז','הערות'],
+      aptsSorted().map(([,a])=>[a.building,a.aptNo,a.floor,a.tenantName,xl(a.phone),xl(a.phone2),xl(a.waterMeter),xl(a.elecMeter),xl(a.elecContract),xl(a.gasMeter),a.notes])));
+    if(missing.length)root.file('קבלות שלא ירדו.txt',missing.join('\r\n'));
+    btn.textContent='אורז קובץ…';
+    const blob=await zip.generateAsync({type:'blob'});
+    const sv=await S.dl.save({filename:'גיבוי-פנקס-תחזוקה-'+today()+'.zip',data:blob});
+    toast(missing.length?`הגיבוי נשמר (${missing.length} קבלות לא ירדו – הרשימה בתוך הקובץ)`:'הגיבוי נשמר'+(sv&&sv.where?' – '+sv.where:''));
+    if(S.canWrite){const st=S.settings;try{await S.db.doc('settings/main').set({vatRate:st.vatRate,categories:st.categories,ownerName:st.ownerName||'',managerName:st.managerName||'',lastBackup:today()})}catch(e){}}
+  }catch(e){if(!e||e.code!=='declined')toast('הגיבוי נכשל. נסו שוב.')}
+  btn.disabled=false;btn.textContent=orig}
+$('#b-run').addEventListener('click',()=>runBackup($('#b-run')));
+$('#r-backup').addEventListener('click',()=>runBackup($('#r-backup')));
+
+/* ---------- settings ---------- */
+let draftCats=null;
+function renderSet(){const st=S.settings;$('#b-last').textContent=st.lastBackup?'גיבוי אחרון: '+fdate(st.lastBackup):'עדיין לא בוצע גיבוי';if(!draftCats)draftCats=st.categories.slice();$('#s-vat').value=st.vatRate;$('#s-owner').value=st.ownerName||'';$('#s-manager').value=st.managerName||'';
+  $('#s-cats').innerHTML=draftCats.map((c,i)=>`<span class="chip cat">${esc(c)}${S.canWrite?`<button data-rm="${i}" aria-label="הסרה">✕</button>`:''}</span>`).join('');
+  $$('#s-cats [data-rm]').forEach(b=>b.addEventListener('click',()=>{draftCats.splice(+b.dataset.rm,1);renderSet()}))}
+$('#s-addcat').addEventListener('click',()=>{const v=$('#s-newcat').value.trim();if(v&&!draftCats.includes(v)){draftCats.push(v);$('#s-newcat').value='';renderSet()}});
+$('#s-save').addEventListener('click',async()=>{const d={lastBackup:S.settings.lastBackup||'',vatRate:+$('#s-vat').value||0,ownerName:$('#s-owner').value.trim(),managerName:$('#s-manager').value.trim(),categories:draftCats.length?draftCats:DEFAULT_CATS};
+  try{await S.db.doc('settings/main').set(d);toast('ההגדרות נשמרו')}catch(e){toast('השמירה נכשלה')}});
+
+/* ---------- account ---------- */
+$('#acc-dash').href=(window.Backend&&Backend.dashboardUrl)||'https://supabase.com/dashboard';
+$('#acc-out').addEventListener('click',()=>window.Backend&&Backend.signOut());
+window.addEventListener('backend-status',ev=>{if(ev.detail.ok){setStatus('')}else{const st=$('#status');st.hidden=false;st.className='notice warn';st.innerHTML='אין חיבור לשרת. בדקו אינטרנט. אם זה נמשך, ייתכן שהשרת הושהה – <a href="'+esc((window.Backend&&Backend.dashboardUrl)||'#')+'" target="_blank" rel="noopener" style="color:inherit;font-weight:700">לחצו כאן לשחזור (Restore)</a>.'}});
+
+/* ---------- boot ---------- */
+function applyWrite(){$$('[data-w]').forEach(b=>b.hidden=!S.canWrite||!S.db);$('#fab').hidden=!(S.tab==='exp'&&S.canWrite&&S.db);$('#s-addcat').hidden=!S.canWrite}
+function rerender(){if(S.tab==='exp')renderExp();else if(S.tab==='apt')renderApts();else if(S.tab==='rep')renderRep()}
+renderExp();applyWrite();
+(async()=>{
+  const cl=window.claude;if(!cl||!cl.use){setStatus('לא ניתן לטעון את האפליקציה.',true);S.canWrite=false;applyWrite();return}
+  const [db,user,assets,dl]=await Promise.all(['db','user','assets','downloads'].map(n=>cl.use(n).catch(()=>null)));
+  S.db=db;S.user=user;S.assets=assets;S.dl=dl;
+  if(!db){setStatus('לא ניתן להתחבר לשרת.',true);S.canWrite=false;applyWrite();return}
+  if(user){try{S.uid=await user.id()}catch(e){}try{const c=await user.can('data.write');if(c===false)S.canWrite=false}catch(e){}
+    try{const me=await user.me();if(me&&me.name){$('#who').textContent='מחובר: '+me.name;$('#acc-who').textContent='מחובר בתור '+(me.email||me.name)}}catch(e){}}
+  if(!S.canWrite)setStatus('צפייה בלבד – אין לך הרשאה לרשום הוצאות בדף זה.');
+  applyWrite();
+  const timer=setTimeout(()=>{if(!(S.loaded.a&&S.loaded.e))setStatus('לא מצליח להגיע לנתונים כרגע. ייתכן שהמידע המוצג אינו עדכני.',true)},10000);
+  const done=()=>{if(S.loaded.a&&S.loaded.e){clearTimeout(timer);if(S.canWrite)setStatus('')}runRecurring()};
+  const fail=e=>{clearTimeout(timer)};
+  db.collection('apartments').onSnapshot(snap=>{const m={};snap.docs.forEach(d=>m[d.id]=d.data());S.apts=m;if(!snap.metadata.fromCache){S.loaded.a=true;done()}rerender()},fail);
+  db.collection('expenses').onSnapshot(snap=>{S.exps=snap.docs.map(d=>Object.assign({id:d.id},d.data()));if(!snap.metadata.fromCache){S.loaded.e=true;done()}rerender();resolveNames()},fail);
+  db.collection('recurring').onSnapshot(snap=>{const m={};snap.docs.forEach(d=>m[d.id]=d.data());S.recs=m;if(!snap.metadata.fromCache){S.loaded.r=true;done()}},()=>{});
+  db.doc('settings/main').onSnapshot(snap=>{if(snap.exists){const d=snap.data();S.settings=Object.assign({},S.settings,d,{categories:(d.categories&&d.categories.length)?d.categories.slice():DEFAULT_CATS.slice()})}draftCats=null;if(S.tab==='set')renderSet();else if(S.tab==='exp')renderExp()},()=>{});
+})();
+})();
+</script>
+
+</body>
+</html>
