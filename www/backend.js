@@ -265,7 +265,7 @@
   };
 
   document.addEventListener('visibilitychange', function () { if (!document.hidden && ready) notify(null); });
-  setInterval(function () { if (ready && !document.hidden) notify(null); }, 60000);
+  setInterval(function () { if (ready && !document.hidden) notify(null); }, 20000);
 
   document.addEventListener('DOMContentLoaded', async function () {
     if (!configured()) { showLogin('האפליקציה עדיין לא מחוברת לשרת. יש למלא את הקובץ config.js.'); $('#lg-form').hidden = true; return; }
