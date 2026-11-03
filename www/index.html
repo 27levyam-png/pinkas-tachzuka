@@ -147,7 +147,10 @@ tr.tot td{font-weight:700;border-top:2px solid var(--ink)}
 .sigpad{position:fixed;inset:0;z-index:35;background:var(--bg);display:flex;flex-direction:column;gap:10px;direction:rtl;padding:calc(12px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
 .sigpad canvas{flex:1;width:100%;min-height:0;background:var(--paper);border:2px dashed var(--line);border-radius:10px;touch-action:none;cursor:crosshair}
 .sig-top{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}.sig-top span{color:var(--muted);font-size:.9rem}
-.sig-acts{display:flex;gap:8px}
+.sig-acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.sigpad .btn{min-height:40px;padding:6px 14px}
+.scan-tools{display:flex;gap:6px 10px;flex-wrap:wrap;align-items:center}
+.sig-top{min-width:0}.sig-top span{overflow-wrap:anywhere}
 #ir{z-index:25}
 .rc{position:relative;width:84px;height:84px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface);display:grid;place-items:center;font-size:.75rem;color:var(--muted);cursor:pointer}
 .rc img{width:100%;height:100%;object-fit:cover}
@@ -595,15 +598,15 @@ async function confirmInternal(){
   catch(e){ok.disabled=false;ok.textContent='אישור וצירוף PDF';irErr('יצירת הקבלה נכשלה. נסו שוב.')}}
 
 /* ---------- smart receipt scan ---------- */
-const SC={src:null,W:0,H:0,q:null,rot:0,mode:'doc',pdf:false,warped:null,final:null,view:null,drag:-1};
+const SC={src:null,W:0,H:0,q:null,rot:0,mode:'doc',pdf:true,free:false,warped:null,final:null,view:null,drag:null};
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 async function uploadReady(blob,type,name){const btn=$('#f-save');if(btn)btn.disabled=true;
-  try{toast('מעלה קבלה…');const r=await S.assets.upload(blob,{type});draftReceipts.push({id:r.id,type:r.contentType||type,name});freshUploads.push(r.id);renderReceipts(false);toast('הקבלה צורפה')}
-  catch(err){showErr('העלאת הקבלה נכשלה. נסו שוב.')}if(btn)btn.disabled=false}
+  try{if(!S.assets)throw new Error('אין חיבור לשמירת קבצים');toast('מעלה קבלה…');const r=await S.assets.upload(blob,{type});draftReceipts.push({id:r.id,type:r.contentType||type,name});freshUploads.push(r.id);renderReceipts(false);toast('הקבלה צורפה')}
+  catch(err){showErr('העלאת הקבלה נכשלה: '+((err&&err.message)||err||'שגיאה לא ידועה'))}if(btn)btn.disabled=false}
 function scanOpen(file){const url=URL.createObjectURL(file),im=new Image();
   im.onload=()=>{URL.revokeObjectURL(url);const s=Math.min(1,3000/Math.max(im.naturalWidth,im.naturalHeight));
     const c=document.createElement('canvas');c.width=Math.round(im.naturalWidth*s);c.height=Math.round(im.naturalHeight*s);c.getContext('2d').drawImage(im,0,0,c.width,c.height);
-    SC.src=c;SC.W=c.width;SC.H=c.height;SC.rot=0;SC.q=detectQuad(c);scanStep1()};
+    SC.src=c;SC.W=c.width;SC.H=c.height;SC.rot=0;SC.q=detectQuad(c);if(!SC.free)SC.q=toRect(SC.q);scanStep1()};
   im.onerror=()=>{URL.revokeObjectURL(url);toast('לא ניתן לפתוח את התמונה')};im.src=url}
 function defQuad(c){const mx=c.width*.04,my=c.height*.04;return[{x:mx,y:my},{x:c.width-mx,y:my},{x:c.width-mx,y:c.height-my},{x:mx,y:c.height-my}]}
 function detectQuad(c){try{
@@ -626,21 +629,32 @@ function detectQuad(c){try{
   return q.map(p=>{const dx=p.x-cx,dy=p.y-cy,l=Math.hypot(dx,dy)||1;return{x:clamp(p.x+dx/l*m,0,c.width),y:clamp(p.y+dy/l*m,0,c.height)}})
 }catch(e){return defQuad(c)}}
 function scanClose(){$('#scan').hidden=true;$('#scan').innerHTML='';SC.src=SC.warped=SC.final=null}
+function toRect(q){const xs=q.map(p=>p.x),ys=q.map(p=>p.y),x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);return[{x:x0,y:y0},{x:x1,y:y0},{x:x1,y:y1},{x:x0,y:y1}]}
+function scHandles(){const q=SC.q,h=q.map((p,i)=>({x:p.x,y:p.y,k:'c'+i}));if(!SC.free){const m=(a,b)=>({x:(q[a].x+q[b].x)/2,y:(q[a].y+q[b].y)/2});h.push(Object.assign(m(0,1),{k:'top'}),Object.assign(m(1,2),{k:'right'}),Object.assign(m(2,3),{k:'bottom'}),Object.assign(m(3,0),{k:'left'}))}return h}
+function scMove(k,p){const q=SC.q,x=clamp(p.x,0,SC.W),y=clamp(p.y,0,SC.H),min=40;
+  if(SC.free){const i=+k.slice(1);q[i]={x,y};return}
+  let x0=q[0].x,x1=q[1].x,y0=q[0].y,y1=q[2].y;
+  if(k==='c0'||k==='c3'||k==='left')x0=Math.min(x,x1-min);if(k==='c1'||k==='c2'||k==='right')x1=Math.max(x,x0+min);
+  if(k==='c0'||k==='c1'||k==='top')y0=Math.min(y,y1-min);if(k==='c3'||k==='c2'||k==='bottom')y1=Math.max(y,y0+min);
+  SC.q=[{x:x0,y:y0},{x:x1,y:y0},{x:x1,y:y1},{x:x0,y:y1}]}
 function scanStep1(){const ov=$('#scan');ov.hidden=false;
-  ov.innerHTML=`<div class="sig-top"><b>סריקת קבלה</b><span>גררו את 4 הנקודות לפינות הקבלה</span></div>
+  ov.innerHTML=`<div class="sig-top"><b>סריקת קבלה</b><span>${SC.free?'גררו כל פינה למקומה':'גררו פינה או צלע לסימון הקבלה'}</span></div>
   <div class="scan-stage" id="sc-stage"><canvas id="sc-c"></canvas></div>
-  <div class="sig-acts"><button type="button" class="btn" id="sc-cancel">ביטול</button><button type="button" class="btn" id="sc-full">כל התמונה</button><button type="button" class="btn" id="sc-auto">זיהוי אוטומטי</button><span style="flex:1"></span><button type="button" class="btn primary" id="sc-next">המשך</button></div>`;
+  <div class="scan-tools"><label class="scan-pdf"><input type="checkbox" id="sc-free" ${SC.free?'checked':''}> כל פינה בנפרד</label><span style="flex:1"></span><button type="button" class="chipbtn" id="sc-auto">זיהוי אוטומטי</button><button type="button" class="chipbtn" id="sc-full">כל התמונה</button></div>
+  <div class="sig-acts"><button type="button" class="btn" id="sc-cancel">ביטול</button><span style="flex:1"></span><button type="button" class="btn primary" id="sc-next">המשך</button></div>`;
   $('#sc-cancel').addEventListener('click',scanClose);
   $('#sc-full').addEventListener('click',()=>{SC.q=[{x:0,y:0},{x:SC.W,y:0},{x:SC.W,y:SC.H},{x:0,y:SC.H}];scDraw()});
-  $('#sc-auto').addEventListener('click',()=>{SC.q=detectQuad(SC.src);scDraw()});
+  $('#sc-auto').addEventListener('click',()=>{const q=detectQuad(SC.src);SC.q=SC.free?q:toRect(q);scDraw()});
+  $('#sc-free').addEventListener('change',ev=>{SC.free=ev.target.checked;if(!SC.free)SC.q=toRect(SC.q);ov.querySelector('.sig-top span').textContent=SC.free?'גררו כל פינה למקומה':'גררו פינה או צלע לסימון הקבלה';scDraw()});
   $('#sc-next').addEventListener('click',()=>{const b=$('#sc-next');b.disabled=true;b.textContent='מעבד…';setTimeout(()=>{try{SC.warped=warp();SC.rot=0;scanStep2()}catch(e){b.disabled=false;b.textContent='המשך';toast('העיבוד נכשל. נסו שוב.')}},30)});
+  if(!SC.free)SC.q=toRect(SC.q);
   const c=$('#sc-c');
   requestAnimationFrame(()=>{scLayout();scDraw()});
   const pos=ev=>{const r=c.getBoundingClientRect(),v=SC.view;return{x:(ev.clientX-r.left-v.ox)/v.f,y:(ev.clientY-r.top-v.oy)/v.f}};
-  c.addEventListener('pointerdown',ev=>{const p=pos(ev),lim=44/SC.view.f;let bi=-1,bd=1e9;SC.q.forEach((h,i)=>{const dd=Math.hypot(h.x-p.x,h.y-p.y);if(dd<bd){bd=dd;bi=i}});
-    if(bd<=lim){SC.drag=bi;try{c.setPointerCapture(ev.pointerId)}catch(e){}ev.preventDefault()}});
-  c.addEventListener('pointermove',ev=>{if(SC.drag<0)return;ev.preventDefault();const p=pos(ev);SC.q[SC.drag]={x:clamp(p.x,0,SC.W),y:clamp(p.y,0,SC.H)};scDraw()});
-  ['pointerup','pointercancel'].forEach(t=>c.addEventListener(t,()=>{SC.drag=-1;scDraw()}));
+  c.addEventListener('pointerdown',ev=>{const p=pos(ev),lim=44/SC.view.f;let bk=null,bd=1e9;scHandles().forEach(h=>{const dd=Math.hypot(h.x-p.x,h.y-p.y);if(dd<bd){bd=dd;bk=h.k}});
+    if(bd<=lim){SC.drag=bk;try{c.setPointerCapture(ev.pointerId)}catch(e){}ev.preventDefault()}});
+  c.addEventListener('pointermove',ev=>{if(!SC.drag)return;ev.preventDefault();scMove(SC.drag,pos(ev));scDraw()});
+  ['pointerup','pointercancel'].forEach(t=>c.addEventListener(t,()=>{SC.drag=null;scDraw()}));
 }
 function scLayout(){const c=$('#sc-c');if(!c)return;const r=c.parentElement.getBoundingClientRect(),dpr=window.devicePixelRatio||1;
   c.width=Math.round(r.width*dpr);c.height=Math.round(r.height*dpr);c.style.width=r.width+'px';c.style.height=r.height+'px';
@@ -650,7 +664,9 @@ function scDraw(){const c=$('#sc-c');if(!c||!SC.view)return;const v=SC.view,x=c.
   const P=SC.q.map(p=>({x:v.ox+p.x*v.f,y:v.oy+p.y*v.f}));
   x.save();x.beginPath();x.rect(v.ox,v.oy,SC.W*v.f,SC.H*v.f);x.moveTo(P[0].x,P[0].y);for(let i=3;i>=0;i--)x.lineTo(P[i].x,P[i].y);x.closePath();x.fillStyle='rgba(0,0,0,.45)';x.fill('evenodd');x.restore();
   x.beginPath();P.forEach((p,i)=>i?x.lineTo(p.x,p.y):x.moveTo(p.x,p.y));x.closePath();x.lineWidth=2.5;x.strokeStyle='#3FD1A6';x.stroke();
-  P.forEach((p,i)=>{x.beginPath();x.arc(p.x,p.y,i===SC.drag?17:13,0,Math.PI*2);x.fillStyle='rgba(255,255,255,.9)';x.fill();x.lineWidth=3;x.strokeStyle='#1E5A4C';x.stroke()})}
+  scHandles().forEach(h=>{const px=v.ox+h.x*v.f,py=v.oy+h.y*v.f,on=h.k===SC.drag;x.beginPath();
+    if(h.k[0]==='c')x.arc(px,py,on?17:13,0,Math.PI*2);else{const w=(h.k==='top'||h.k==='bottom')?28:10,hh=(h.k==='top'||h.k==='bottom')?10:28;x.roundRect?x.roundRect(px-w/2,py-hh/2,w,hh,5):x.rect(px-w/2,py-hh/2,w,hh)}
+    x.fillStyle='rgba(255,255,255,.92)';x.fill();x.lineWidth=3;x.strokeStyle='#1E5A4C';x.stroke()})}
 function homography(dst,src){const A=[],B=[];
   for(let i=0;i<4;i++){const {x,y}=dst[i],{x:u,y:v}=src[i];A.push([x,y,1,0,0,0,-u*x,-u*y]);B.push(u);A.push([0,0,0,x,y,1,-v*x,-v*y]);B.push(v)}
   const n=8;for(let i=0;i<n;i++){let p=i;for(let r=i+1;r<n;r++)if(Math.abs(A[r][i])>Math.abs(A[p][i]))p=r;[A[i],A[p]]=[A[p],A[i]];[B[i],B[p]]=[B[p],B[i]];
@@ -668,17 +684,33 @@ function warp(){const q=SC.q,dd=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
   ox.putImageData(od,0,0);return out}
 function rotated(src,r){if(!r)return src;const c=document.createElement('canvas'),odd=r%2===1;c.width=odd?src.height:src.width;c.height=odd?src.width:src.height;
   const x=c.getContext('2d');x.translate(c.width/2,c.height/2);x.rotate(r*Math.PI/2);x.drawImage(src,-src.width/2,-src.height/2);return c}
-function enhance(src,mode){if(mode==='orig')return src;const w=src.width,h=src.height,out=document.createElement('canvas');out.width=w;out.height=h;
+function edgeMask(src){const s=Math.min(1,600/Math.max(src.width,src.height)),mw=Math.max(8,Math.round(src.width*s)),mh=Math.max(8,Math.round(src.height*s));
+  const t=document.createElement('canvas');t.width=mw;t.height=mh;const x=t.getContext('2d',{willReadFrequently:true});x.drawImage(src,0,0,mw,mh);
+  const d=x.getImageData(0,0,mw,mh).data,N=mw*mh,g=new Uint8Array(N),hist=new Array(256).fill(0);
+  for(let i=0;i<N;i++){const r=d[i*4],gg=d[i*4+1],b=d[i*4+2],mx=Math.max(r,gg,b),mn=Math.min(r,gg,b);let v=(r*.3+gg*.59+b*.11);v-=Math.max(0,(mx-mn)-40)*.8;v=v<0?0:v|0;g[i]=v;hist[v]++}
+  let sum=0;for(let i=0;i<256;i++)sum+=i*hist[i];let sB=0,wB=0,best=0,th=0;
+  for(let i=0;i<256;i++){wB+=hist[i];if(!wB)continue;const wF=N-wB;if(!wF)break;sB+=i*hist[i];const mB=sB/wB,mF=(sum-sB)/wF,bb=wB*wF*(mB-mF)*(mB-mF);if(bb>best){best=bb;th=i}}
+  const m=new Uint8Array(N),st=[];const push=i=>{if(!m[i]&&g[i]<=th){m[i]=1;st.push(i)}};
+  for(let xx=0;xx<mw;xx++){push(xx);push((mh-1)*mw+xx)}for(let yy=0;yy<mh;yy++){push(yy*mw);push(yy*mw+mw-1)}
+  while(st.length){const p=st.pop(),px=p%mw,py=(p/mw)|0;if(px>0)push(p-1);if(px<mw-1)push(p+1);if(py>0)push(p-mw);if(py<mh-1)push(p+mw)}
+  let cnt=0;for(let i=0;i<N;i++)cnt+=m[i];if(cnt>N*.6)return null;
+  for(let it=0;it<2;it++){const c=m.slice();for(let yy=0;yy<mh;yy++)for(let xx=0;xx<mw;xx++){const i=yy*mw+xx;if(c[i])continue;if((xx>0&&c[i-1])||(xx<mw-1&&c[i+1])||(yy>0&&c[i-mw])||(yy<mh-1&&c[i+mw]))m[i]=1}}
+  return{m,mw,mh}}
+function enhance(src,mode){if(mode==='orig')return src;const EM=edgeMask(src);const w=src.width,h=src.height,out=document.createElement('canvas');out.width=w;out.height=h;
   const x=out.getContext('2d',{willReadFrequently:true});x.drawImage(src,0,0);const id=x.getImageData(0,0,w,h),d=id.data;
   const B=Math.max(16,Math.round(Math.max(w,h)/45)),gw=Math.ceil(w/B),gh=Math.ceil(h/B),grid=new Float32Array(gw*gh),hist=new Uint32Array(256);
   for(let gy=0;gy<gh;gy++)for(let gx=0;gx<gw;gx++){hist.fill(0);let n=0;const y1=Math.min(h,(gy+1)*B),x1=Math.min(w,(gx+1)*B);
     for(let yy=gy*B;yy<y1;yy+=2)for(let xx=gx*B;xx<x1;xx+=2){const i=(yy*w+xx)*4;hist[(d[i]*.3+d[i+1]*.59+d[i+2]*.11)|0]++;n++}
     let acc=0,lim=n*.9,v=255;for(let k=0;k<256;k++){acc+=hist[k];if(acc>=lim){v=k;break}}grid[gy*gw+gx]=Math.max(v,40)}
+  const bgm=new Uint8Array(gw*gh),stk=[];for(let gy=0;gy<gh;gy++)for(let gx=0;gx<gw;gx++){if((gy===0||gx===0||gy===gh-1||gx===gw-1)&&grid[gy*gw+gx]<125){bgm[gy*gw+gx]=1;stk.push(gy*gw+gx)}}
+  while(stk.length){const c=stk.pop(),cx=c%gw,cy=(c/gw)|0;for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=cx+dx,ny=cy+dy;if(nx<0||ny<0||nx>=gw||ny>=gh)continue;const n=ny*gw+nx;if(!bgm[n]&&grid[n]<125){bgm[n]=1;stk.push(n)}}}
+  for(let c=0;c<gw*gh;c++){if(bgm[c]!==1)continue;const cx=c%gw,cy=(c/gw)|0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const nx=cx+dx,ny=cy+dy;if(nx<0||ny<0||nx>=gw||ny>=gh)continue;const n=ny*gw+nx;if(!bgm[n])bgm[n]=2}}
   for(let pass=0;pass<2;pass++){const g2=grid.slice();for(let gy=0;gy<gh;gy++)for(let gx=0;gx<gw;gx++){let s=0,c=0;
     for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++){const yy=gy+a,xx=gx+b;if(yy>=0&&yy<gh&&xx>=0&&xx<gw){s+=g2[yy*gw+xx];c++}}grid[gy*gw+gx]=s/c}}
   for(let y=0;y<h;y++){const gyf=clamp(y/B-.5,0,gh-1),gy0=gyf|0,gy1=Math.min(gh-1,gy0+1),fy=gyf-gy0;
     for(let xx=0;xx<w;xx++){const gxf=clamp(xx/B-.5,0,gw-1),gx0=gxf|0,gx1=Math.min(gw-1,gx0+1),fx=gxf-gx0;
       const a=grid[gy0*gw+gx0]+(grid[gy0*gw+gx1]-grid[gy0*gw+gx0])*fx,b=grid[gy1*gw+gx0]+(grid[gy1*gw+gx1]-grid[gy1*gw+gx0])*fx,bg=a+(b-a)*fy,i=(y*w+xx)*4;
+      const ci=Math.min(gh-1,(y/B)|0)*gw+Math.min(gw-1,(xx/B)|0);if(bgm[ci]===1||(bgm[ci]===2&&bg<135)){d[i]=d[i+1]=d[i+2]=255;continue}if(EM&&EM.m[((y*EM.mh/h)|0)*EM.mw+((xx*EM.mw/w)|0)]){d[i]=d[i+1]=d[i+2]=255;continue}
       if(mode==='doc'){const L=(d[i]*.3+d[i+1]*.59+d[i+2]*.11)/bg*255;let t=clamp((L-95)/(232-95),0,1);t=Math.pow(t,1.6);const v=t*255;d[i]=d[i+1]=d[i+2]=v}
       else{for(let ch=0;ch<3;ch++){let v=d[i+ch]/bg*255;v=(v-128)*1.12+128+6;d[i+ch]=clamp(v,0,255)}}}}
   x.putImageData(id,0,0);return out}
@@ -698,14 +730,19 @@ function scRender(){$$('#scan [data-m]').forEach(b=>b.setAttribute('aria-pressed
   setTimeout(()=>{try{SC.final=enhance(rotated(SC.warped,SC.rot),SC.mode);SC.final.className='scan-out';pv.innerHTML='';pv.appendChild(SC.final);scSize()}catch(e){pv.textContent='העיבוד נכשל'}},30)}
 async function scBlob(){return await new Promise(r=>SC.final.toBlob(r,'image/jpeg',SC.mode==='doc'?.8:.85))}
 async function scSize(){try{const b=await scBlob();$('#sc-size').textContent='גודל משוער: '+Math.max(1,Math.round(b.size/1024))+'KB'+(SC.pdf?' · PDF':'')}catch(e){}}
-async function scanConfirm(){const b=$('#sc-ok');b.disabled=true;b.textContent='שומר…';
-  try{const jpg=await scBlob();const stamp=fdate($('#f-date')?$('#f-date').value:today()).replace(/\//g,'-');
-    if(SC.pdf){if(!window.jspdf)throw 0;const w=SC.final.width,h=SC.final.height,pw=210,ph=Math.max(40,210*h/w);
-      const pdf=new window.jspdf.jsPDF({unit:'mm',format:[pw,ph],orientation:pw>ph?'l':'p'});
-      const du=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(jpg)});
+function ensureJsPDF(){if(window.jspdf&&window.jspdf.jsPDF)return Promise.resolve(true);
+  const load=src=>new Promise(ok=>{const s=document.createElement('script');s.src=src;s.onload=()=>ok(!!(window.jspdf&&window.jspdf.jsPDF));s.onerror=()=>ok(false);document.head.appendChild(s)});
+  return load('lib/jspdf.umd.min.js').then(r=>r||load('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'))}
+async function scanConfirm(){const b=$('#sc-ok');b.disabled=true;b.textContent='שומר…';let step='הכנת התמונה';
+  try{const jpg=await scBlob();if(!jpg)throw new Error('התמונה ריקה');const stamp=fdate($('#f-date')?$('#f-date').value:today()).replace(/\//g,'-');
+    if(SC.pdf){step='יצירת PDF';
+      if(!(await ensureJsPDF())){toast('רכיב ה-PDF לא זמין, הקבלה נשמרת כתמונה');scanClose();await uploadReady(jpg,'image/jpeg','סריקה '+stamp+'.jpg');return}
+      const w=SC.final.width,h=SC.final.height,pw=210,ph=Math.round(Math.max(40,210*h/w)*100)/100;
+      const pdf=new window.jspdf.jsPDF({unit:'mm',format:pw>ph?[ph,pw]:[pw,ph],orientation:pw>ph?'l':'p'});
+      const du=await new Promise((r,j)=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.onerror=()=>j(fr.error);fr.readAsDataURL(jpg)});
       pdf.addImage(du,'JPEG',0,0,pw,ph);const pb=pdf.output('blob');scanClose();await uploadReady(pb,'application/pdf','סריקה '+stamp+'.pdf')}
     else{scanClose();await uploadReady(jpg,'image/jpeg','סריקה '+stamp+'.jpg')}}
-  catch(e){b.disabled=false;b.textContent='צירוף לקבלות';toast('השמירה נכשלה. נסו שוב.')}}
+  catch(e){b.disabled=false;b.textContent='צירוף לקבלות';toast('השמירה נכשלה ב'+step+': '+((e&&e.message)||e||'שגיאה לא ידועה'))}}
 window.addEventListener('resize',()=>{if(!$('#scan').hidden&&$('#sc-c')){scLayout();scDraw()}});
 
 /* ---------- apartments ---------- */
