@@ -219,6 +219,19 @@
     }
   };
 
+  downloads.open = async function (req) {
+    var blob = toBlob(req.data, req.filename), name = req.filename;
+    if (isNative()) {
+      var P = window.Capacitor.Plugins, b64 = await blobToBase64(blob);
+      var c = await P.Filesystem.writeFile({ path: name, data: b64, directory: 'CACHE', recursive: true });
+      await P.Share.share({ title: name, url: c.uri, dialogTitle: 'פתיחה באמצעות' });
+      return { status: 'saved' };
+    }
+    var url = URL.createObjectURL(blob), w = window.open(url, '_blank');
+    if (!w) { var a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
+    return { status: 'saved' };
+  };
+
   /* ---------- the same entry point the app already uses ---------- */
   var caps = { db: db, user: user, assets: assets, downloads: downloads };
   window.claude = { use: async function (name) { await readyPromise; return caps[name] || null; } };

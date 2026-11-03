@@ -156,8 +156,20 @@ tr.tot td{font-weight:700;border-top:2px solid var(--ink)}
 .rc img{width:100%;height:100%;object-fit:cover}
 .rc .x{position:absolute;top:2px;left:2px;background:var(--surface);border:1px solid var(--line);border-radius:999px;width:22px;height:22px;line-height:18px;font-size:.8rem;cursor:pointer}
 .foot{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap}
-.lightbox{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.85);display:grid;place-items:center;padding:20px}
-.lightbox img{max-height:90vh;border-radius:6px}
+.lightbox{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.9);display:flex;flex-direction:column;gap:10px;padding:calc(58px + env(safe-area-inset-top,0px)) 12px calc(12px + env(safe-area-inset-bottom,0px))}
+.lb-scroll{flex:1;min-height:0;overflow:hidden;display:flex;width:100%;touch-action:none}
+.lb-img{margin:auto;max-width:100%;max-height:100%;border-radius:6px;background:#fff;cursor:grab;transform-origin:50% 50%;will-change:transform;user-select:none;-webkit-user-drag:none}
+.lb-bar{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap}
+.lb-hint,.lb-msg{color:#fff;font-size:.9rem;margin:auto}
+.rc-tag{position:absolute;bottom:3px;right:3px;background:var(--accent);color:var(--accent-ink);font-size:.7rem;font-weight:700;padding:0 5px;border-radius:4px}
+.rc .x{width:26px;height:26px}
+.confirm{position:fixed;inset:0;z-index:70;background:rgba(10,20,15,.55);display:grid;place-items:center;padding:20px}
+.cf-card{background:var(--bg);border-radius:14px;padding:18px;max-width:360px;width:100%;display:grid;gap:14px;direction:rtl;box-shadow:var(--shadow)}
+.cf-card p{margin:0;font-weight:700;font-size:1.05rem}
+.btn.danger-fill{background:var(--danger);border-color:var(--danger);color:#fff}
+.closex{position:absolute;top:calc(8px + env(safe-area-inset-top,0px));left:max(10px,env(safe-area-inset-left,0px));z-index:6;width:42px;height:42px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:1.15rem;line-height:1;cursor:pointer;box-shadow:var(--shadow);display:grid;place-items:center;padding:0}
+.sheet-card>.closex{position:sticky;top:0;left:auto;justify-self:end;margin-bottom:-54px}
+.sigpad .sig-top{padding-left:54px}
 .toast{position:fixed;bottom:calc(84px + env(safe-area-inset-bottom,0px));right:50%;transform:translateX(50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:999px;z-index:40;font-weight:600}
 .catlist{display:flex;gap:6px;flex-wrap:wrap}
 .catlist .chip{display:inline-flex;gap:6px;align-items:center;font-size:.9rem;padding:4px 10px}
@@ -299,6 +311,7 @@ a.btn{text-decoration:none}
 <button class="btn primary fab" id="fab" data-w>+ הוצאה חדשה</button>
 <div class="sheet" id="sheet" hidden><div class="sheet-card" id="sheet-card"></div></div>
 <div class="lightbox" id="lightbox" hidden></div>
+<div class="confirm" id="confirm" hidden></div>
 <div class="toast" id="toast" hidden></div>
 <div class="sheet" id="ir" hidden><div class="sheet-card" id="ir-card"></div></div>
 <div class="sigpad" id="scan" hidden></div>
@@ -379,7 +392,7 @@ function renderExp(){
 }
 
 /* ---------- sheet ---------- */
-function openSheet(html){$('#sheet-card').innerHTML=html;$('#sheet').hidden=false;document.body.style.overflow='hidden'}
+function openSheet(html){$('#sheet-card').innerHTML=html;addX($('#sheet-card'),cancelExpense);$('#sheet').hidden=false;document.body.style.overflow='hidden'}
 function closeSheet(){$('#sheet').hidden=true;document.body.style.overflow=''}
 $('#sheet').addEventListener('click',e=>{if(e.target.id==='sheet')cancelExpense()});
 let draftReceipts=[],freshUploads=[];
@@ -426,14 +439,19 @@ function openExpense(id){
   const fsn=$('#f-scan');if(fsn)fsn.addEventListener('change',()=>{const f=fsn.files[0];fsn.value='';if(f)scanOpen(f)});
   const fi=$('#f-file');if(fi)fi.addEventListener('change',()=>uploadFiles([...fi.files]).then(()=>fi.value=''));
   $('#f-cancel').addEventListener('click',cancelExpense);
-  if($('#f-del'))armConfirm($('#f-del'),'למחוק? לחצו שוב',async()=>{try{await S.db.doc('expenses/'+e.id).delete();for(const r of (e.receipts||[])){try{await S.assets&&S.assets.delete(r.id)}catch(x){}}closeSheet();toast('ההוצאה נמחקה')}catch(err){showErr('המחיקה נכשלה. נסו שוב.')}});
+  if($('#f-del'))armConfirm($('#f-del'),'למחוק? לחצו שוב',async()=>{try{await S.db.doc('expenses/'+e.id).delete();for(const r of (e.receipts||[])){for(const id of [r.id,r.preview].filter(Boolean)){try{await S.assets&&S.assets.delete(id)}catch(x){}}}closeSheet();toast('ההוצאה נמחקה')}catch(err){showErr('המחיקה נכשלה. נסו שוב.')}});
   $('#ef').addEventListener('submit',ev=>{ev.preventDefault();saveExpense(e)});
 }
 function showErr(m){const x=$('#f-err');if(x){x.hidden=false;x.className='notice warn';x.textContent=m}}
 function renderReceipts(ro){const box=$('#f-rc');if(!box)return;
-  box.innerHTML=draftReceipts.length?draftReceipts.map((r,i)=>`<div class="rc" data-i="${i}">${r.type==='application/pdf'?'PDF':`<img data-blob="${esc(r.id)}" alt="קבלה">`}${ro?'':`<button type="button" class="x" data-x="${i}" aria-label="הסרה">✕</button>`}</div>`).join(''):'<span style="color:var(--muted);font-size:.9rem">לא צורפו קבלות</span>';
+  box.innerHTML=draftReceipts.length?draftReceipts.map((r,i)=>{const pid=r.type==='application/pdf'?r.preview:r.id;return `<div class="rc" data-i="${i}" role="button" tabindex="0" aria-label="צפייה בקבלה">${pid?`<img data-blob="${esc(pid)}" alt="קבלה">`:'<span>קבלה</span>'}${r.type==='application/pdf'?'<span class="rc-tag">PDF</span>':''}${ro?'':`<button type="button" class="x" data-x="${i}" aria-label="מחיקת הקבלה">✕</button>`}</div>`}).join(''):'<span style="color:var(--muted);font-size:.9rem">לא צורפו קבלות</span>';
   box.querySelectorAll('img[data-blob]').forEach(im=>S.assets.objectUrl(im.dataset.blob).then(u=>im.src=u).catch(()=>im.replaceWith(document.createTextNode('קבלה'))));
-  box.querySelectorAll('.rc').forEach(el=>el.addEventListener('click',ev=>{if(ev.target.dataset.x!==undefined){const r=draftReceipts.splice(+ev.target.dataset.x,1)[0];if(freshUploads.includes(r.id)&&S.assets){S.assets.delete(r.id).catch(()=>{})}renderReceipts(ro);return}openReceipt(draftReceipts[+el.dataset.i])}))}
+  box.querySelectorAll('.rc').forEach(el=>{const open=()=>openReceipt(draftReceipts[+el.dataset.i]);el.addEventListener('keydown',ev=>{if(ev.key==='Enter')open()});
+    el.addEventListener('click',async ev=>{const xb=ev.target.closest('[data-x]');if(xb){ev.stopPropagation();if(!(await askConfirm('למחוק את הקבלה הזו?','מחיקה')))return;
+      const r=draftReceipts.splice(+xb.dataset.x,1)[0];if(r&&S.assets)[r.id,r.preview].filter(Boolean).forEach(id=>{if(freshUploads.includes(id))S.assets.delete(id).catch(()=>{})});renderReceipts(ro);return}open()})})}
+function askConfirm(msg,okLabel){return new Promise(res=>{const m=$('#confirm');m.innerHTML=`<div class="cf-card" role="alertdialog" aria-modal="true"><p>${esc(msg)}</p><div class="row" style="justify-content:flex-start"><button type="button" class="btn danger-fill" id="cf-yes">${esc(okLabel||'אישור')}</button><button type="button" class="btn" id="cf-no">ביטול</button></div></div>`;
+  m.hidden=false;const done=v=>{m.hidden=true;m.innerHTML='';res(v)};$('#cf-no').addEventListener('click',()=>done(false));$('#cf-yes').addEventListener('click',()=>done(true));m.onclick=ev=>{if(ev.target===m)done(false)};$('#cf-no').focus()})}
+function addX(host,fn){if(!host)return;const old=host.querySelector(':scope > .closex');if(old)old.remove();const b=document.createElement('button');b.type='button';b.className='closex';b.setAttribute('aria-label','סגירה');b.textContent='✕';b.addEventListener('click',ev=>{ev.stopPropagation();fn()});host.prepend(b);return b}
 async function shrink(file){if(!file.type.startsWith('image/')||file.size<2.5e6)return file;
   try{const bmp=await createImageBitmap(file);const sc=Math.min(1,2400/Math.max(bmp.width,bmp.height));const c=document.createElement('canvas');c.width=Math.round(bmp.width*sc);c.height=Math.round(bmp.height*sc);c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
     return await new Promise(res=>c.toBlob(b=>res(b||file),'image/jpeg',.88))}catch(e){return file}}
@@ -442,11 +460,34 @@ async function uploadFiles(files){const btn=$('#f-save');if(btn)btn.disabled=tru
     catch(err){showErr(err&&err.code==='too_large'?'הקובץ גדול מדי (עד 20MB).':err&&err.code==='unsupported_type'?'סוג קובץ לא נתמך. אפשר תמונה או PDF.':'העלאת הקבלה נכשלה. נסו שוב.')}}
   if(btn)btn.disabled=false;renderReceipts(false)}
 function cancelExpense(){if(S.assets)freshUploads.forEach(id=>S.assets.delete(id).catch(()=>{}));freshUploads=[];closeSheet()}
-async function openReceipt(r){if(!r)return;
-  if(r.type==='application/pdf'){if(!S.dl){toast('הורדה אינה זמינה בתצוגה זו');return}
-    try{const b=await S.assets.fetchBlob(r.id);await S.dl.save({filename:r.name&&r.name.endsWith('.pdf')?r.name:'קבלה.pdf',data:b})}catch(e){if(!e||e.code!=='declined')toast('לא ניתן לפתוח את הקובץ')}return}
-  const lb=$('#lightbox');lb.innerHTML='<span style="color:#fff">טוען קבלה…</span>';lb.hidden=false;S.assets.objectUrl(r.id).then(u=>{lb.innerHTML=`<img src="${u}" alt="קבלה">`}).catch(()=>{lb.innerHTML='<span style="color:#fff">לא ניתן לטעון את הקבלה</span>'})}
-$('#lightbox').addEventListener('click',()=>$('#lightbox').hidden=true);
+async function openReceipt(r){if(!r)return;const lb=$('#lightbox'),isPdf=r.type==='application/pdf',vid=isPdf?r.preview:r.id;
+  if(isPdf&&!vid)return openOriginal(r);
+  lb.innerHTML='<div class="lb-msg">טוען קבלה…</div>';lb.hidden=false;addX(lb,closeLightbox);
+  try{const u=await S.assets.objectUrl(vid);lb.innerHTML=`<div class="lb-scroll"><img src="${u}" alt="קבלה" class="lb-img"></div><div class="lb-bar">${isPdf?'<button type="button" class="btn" id="lb-orig">פתיחת קובץ ה-PDF</button>':''}<span class="lb-hint">הגדלה בשתי אצבעות · הקשה כפולה להגדלה או לאיפוס</span></div>`;addX(lb,closeLightbox);
+    pinchZoom(lb.querySelector('.lb-img'));const o=$('#lb-orig');if(o)o.addEventListener('click',()=>openOriginal(r))}
+  catch(e){lb.innerHTML='<div class="lb-msg">לא ניתן לטעון את הקבלה</div>';addX(lb,closeLightbox)}}
+function pinchZoom(img){const host=img.parentElement,pts=new Map();let sc=1,tx=0,ty=0,start=null,lastTap=0;
+  const apply=()=>{img.style.transform=`translate(${tx}px,${ty}px) scale(${sc})`};
+  const fix=()=>{if(sc<=1.001){sc=1;tx=0;ty=0;return}const r=host.getBoundingClientRect(),mx=Math.max(0,(img.offsetWidth*sc-r.width)/2),my=Math.max(0,(img.offsetHeight*sc-r.height)/2);tx=clamp(tx,-mx,mx);ty=clamp(ty,-my,my)};
+  const snap=()=>{const a=[...pts.values()];if(a.length>=2)return{mode:'pinch',d:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y)||1,cx:(a[0].x+a[1].x)/2,cy:(a[0].y+a[1].y)/2,sc,tx,ty};return a.length?{mode:'pan',x:a[0].x,y:a[0].y,tx,ty,moved:false}:null};
+  const center=()=>{const r=host.getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height/2}};
+  host.style.touchAction='none';
+  host.addEventListener('pointerdown',ev=>{try{host.setPointerCapture(ev.pointerId)}catch(e){}pts.set(ev.pointerId,{x:ev.clientX,y:ev.clientY});start=snap()});
+  host.addEventListener('pointermove',ev=>{if(!pts.has(ev.pointerId)||!start)return;pts.set(ev.pointerId,{x:ev.clientX,y:ev.clientY});const a=[...pts.values()];
+    if(start.mode==='pinch'&&a.length>=2){const d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y),cx=(a[0].x+a[1].x)/2,cy=(a[0].y+a[1].y)/2,ns=clamp(start.sc*d/start.d,1,6),k=ns/start.sc,c=center(),ox=start.cx-c.x,oy=start.cy-c.y;
+      tx=ox-(ox-start.tx)*k+(cx-start.cx);ty=oy-(oy-start.ty)*k+(cy-start.cy);sc=ns}
+    else if(start.mode==='pan'){if(Math.hypot(ev.clientX-start.x,ev.clientY-start.y)>8)start.moved=true;if(sc>1){tx=start.tx+ev.clientX-start.x;ty=start.ty+ev.clientY-start.y}}
+    fix();apply()});
+  const end=ev=>{const wasTap=start&&start.mode==='pan'&&!start.moved&&pts.size===1;pts.delete(ev.pointerId);
+    if(wasTap&&ev.type==='pointerup'){const now=Date.now();if(now-lastTap<320){lastTap=0;const c=center();if(sc>1){sc=1;tx=ty=0}else{sc=2.5;tx=-(ev.clientX-c.x)*1.5;ty=-(ev.clientY-c.y)*1.5;fix()}img.style.transition='transform .2s';apply();setTimeout(()=>img.style.transition='',230)}else lastTap=now}
+    start=snap()};
+  host.addEventListener('pointerup',end);host.addEventListener('pointercancel',end);
+  host.addEventListener('wheel',ev=>{ev.preventDefault();sc=clamp(sc*(ev.deltaY<0?1.15:1/1.15),1,6);fix();apply()},{passive:false})}
+function closeLightbox(){const lb=$('#lightbox');lb.hidden=true;lb.innerHTML=''}
+async function openOriginal(r){try{const b=await S.assets.fetchBlob(r.id),name=r.name&&/\.pdf$/i.test(r.name)?r.name:'קבלה.pdf';
+  if(S.dl&&S.dl.open){await S.dl.open({filename:name,data:b});return}if(S.dl){const sv=await S.dl.save({filename:name,data:b});toast((sv&&sv.where)||'הקובץ נשמר');return}toast('פתיחת הקובץ אינה זמינה בתצוגה זו')}
+  catch(e){if(!e||e.code!=='declined')toast('לא ניתן לפתוח את הקובץ')}}
+$('#lightbox').addEventListener('click',ev=>{if(ev.target.id==='lightbox')closeLightbox()});
 async function saveExpense(old){
   const aptId=$('#f-apt').value,date=$('#f-date').value,amount=$('#f-amount').value;
   if(!date)return showErr('נא לבחור תאריך.');if(!aptId)return showErr('נא לבחור דירה או שטח משותף.');if(!(+amount>0))return showErr('נא להזין סכום.');
@@ -458,7 +499,7 @@ async function saveExpense(old){
     createdAt:old?old.createdAt||Date.now():Date.now(),createdBy:old?(old.createdBy||''):(S.uid||''),updatedAt:Date.now(),updatedBy:S.uid||''};
   const btn=$('#f-save');btn.disabled=true;
   try{const ref=old?S.db.doc('expenses/'+old.id):S.db.collection('expenses').doc();await ref.set(doc);
-    if(old&&S.assets){(old.receipts||[]).filter(r=>!draftReceipts.some(d=>d.id===r.id)).forEach(r=>S.assets.delete(r.id).catch(()=>{}))}
+    if(old&&S.assets){(old.receipts||[]).filter(r=>!draftReceipts.some(d=>d.id===r.id)).forEach(r=>[r.id,r.preview].filter(Boolean).forEach(id=>S.assets.delete(id).catch(()=>{})))}
     freshUploads=[];closeSheet();toast(old?'ההוצאה עודכנה':'ההוצאה נשמרה');if(!old){$('#e-month').value=date.slice(0,7);renderExp()}}
   catch(err){btn.disabled=false;showErr(err&&err.code==='quota_exceeded'?'מאגר הנתונים מלא. יש למחוק הוצאות ישנות.':'השמירה נכשלה. בדקו חיבור ונסו שוב.')}}
 $('#fab').addEventListener('click',()=>openExpense(null));
@@ -547,7 +588,7 @@ function openInternal(){
   <button type="button" class="sigbox" id="ir-sigbox">לחצו כאן לחתימה</button>
   <div class="notice warn" id="ir-err" hidden></div>
   <div class="foot"><span></span><div class="row"><button type="button" class="btn" id="ir-cancel">ביטול</button><button type="button" class="btn primary" id="ir-ok">אישור וצירוף PDF</button></div></div>`;
-  $('#ir').hidden=false;$('#ir-card').scrollTop=0;
+  $('#ir').hidden=false;$('#ir-card').scrollTop=0;addX($('#ir-card'),()=>$('#ir').hidden=true);
   $('#ir-cancel').addEventListener('click',()=>$('#ir').hidden=true);
   $('#ir-sigbox').addEventListener('click',openSig);
   $('#ir-ok').addEventListener('click',confirmInternal);
@@ -563,7 +604,7 @@ sigC.addEventListener('pointerdown',ev=>{if(!sigCtx)return;ev.preventDefault();s
 sigC.addEventListener('pointermove',ev=>{if(!sigDown)return;ev.preventDefault();const[x,y]=sigPos(ev);sigCtx.lineTo(x,y);sigCtx.stroke()});
 ['pointerup','pointercancel','pointerleave'].forEach(t=>sigC.addEventListener(t,()=>sigDown=false));
 $('#sig-clear').addEventListener('click',()=>{if(sigCtx){sigCtx.clearRect(0,0,sigC.width,sigC.height);sigDrawn=false}});
-$('#sig-cancel').addEventListener('click',()=>$('#sig').hidden=true);
+$('#sig-cancel').addEventListener('click',()=>$('#sig').hidden=true);addX($('#sig'),()=>$('#sig').hidden=true);
 $('#sig-ok').addEventListener('click',()=>{if(!sigDrawn){toast('נא לחתום בתוך המסגרת');return}
   irSig=sigC.toDataURL('image/png');$('#sig').hidden=true;const b=$('#ir-sigbox');if(b)b.innerHTML=`<img src="${irSig}" alt="חתימה">`;irErr('')});
 /* receipt PDF: draw the page on a canvas (keeps Hebrew right-to-left), wrap it in an A4 PDF */
@@ -586,7 +627,7 @@ async function makeReceiptPdf(d){
   const bx=L,bw=R-L-180,bh=260,by=y-40;x.strokeStyle='#999';x.lineWidth=2;x.strokeRect(bx,by,bw,bh);
   if(d.sig){const img=new Image();await new Promise((ok,no)=>{img.onload=ok;img.onerror=no;img.src=d.sig});const sc=Math.min((bw-30)/img.width,(bh-30)/img.height);const iw=img.width*sc,ih=img.height*sc;x.drawImage(img,bx+(bw-iw)/2,by+(bh-ih)/2,iw,ih)}
   txt('מסמך פנימי לצורך החזר הוצאות. אינו חשבונית מס.',24,H-90,{c:'#777'});
-  const pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4'});pdf.addImage(c.toDataURL('image/jpeg',.9),'JPEG',0,0,210,297);return pdf.output('blob')}
+  const pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4'});pdf.addImage(c.toDataURL('image/jpeg',.9),'JPEG',0,0,210,297);const pb=pdf.output('blob');try{pb.previewJpeg=await new Promise(r=>c.toBlob(r,'image/jpeg',.85))}catch(e){}return pb}
 async function confirmInternal(){
   const d={date:$('#ir-date').value,no:$('#ir-no').value.trim(),addr:$('#ir-addr').value.trim(),apt:$('#ir-apt').value.trim(),ten:$('#ir-ten').value.trim(),con:$('#ir-con').value.trim(),desc:$('#ir-desc').value.trim(),amt:r2($('#ir-amt').value),sig:irSig};
   if(!d.date)return irErr('נא לבחור תאריך.');if(!d.con)return irErr('נא למלא מי תיקן.');if(!d.desc)return irErr('נא למלא את מהות התקלה.');if(!(d.amt>0))return irErr('נא להזין סכום.');if(!d.sig)return irErr('נא לחתום בתיבת החתימה.');
@@ -594,7 +635,7 @@ async function confirmInternal(){
   if(!S.assets)return irErr('צירוף קבצים זמין רק למי שהוזמן לדף בהרשאת עריכה.');
   const ok=$('#ir-ok');ok.disabled=true;ok.textContent='מפיק PDF…';
   try{const blob=await makeReceiptPdf(d);const r=await S.assets.upload(blob,{type:'application/pdf'});
-    draftReceipts.push({id:r.id,type:'application/pdf',name:'קבלה פנימית '+d.no+'.pdf',internal:true});freshUploads.push(r.id);
+    freshUploads.push(r.id);let pid='';if(blob.previewJpeg){try{const pv=await S.assets.upload(blob.previewJpeg,{type:'image/jpeg'});pid=pv.id;freshUploads.push(pid)}catch(e){}}draftReceipts.push({id:r.id,type:'application/pdf',name:'קבלה פנימית '+d.no+'.pdf',internal:true,preview:pid||undefined});
     $('#f-date').value=d.date;$('#f-con').value=d.con;$('#f-desc').value=d.desc;$('#f-amount').value=d.amt;$('#f-vm').value='none';if(!$('#f-inv').value)$('#f-inv').value=d.no;
     $('#f-vm').dispatchEvent(new Event('change'));renderReceipts(false);$('#ir').hidden=true;toast('הקבלה הפנימית צורפה. לחצו "שמירה" לשמירת ההוצאה.')}
   catch(e){ok.disabled=false;ok.textContent='אישור וצירוף PDF';irErr('יצירת הקבלה נכשלה. נסו שוב.')}}
@@ -602,8 +643,8 @@ async function confirmInternal(){
 /* ---------- smart receipt scan ---------- */
 const SC={src:null,W:0,H:0,q:null,rot:0,mode:'doc',pdf:true,free:false,warped:null,final:null,view:null,drag:null};
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
-async function uploadReady(blob,type,name){const btn=$('#f-save');if(btn)btn.disabled=true;
-  try{if(!S.assets)throw new Error('אין חיבור לשמירת קבצים');toast('מעלה קבלה…');const r=await S.assets.upload(blob,{type});draftReceipts.push({id:r.id,type:r.contentType||type,name});freshUploads.push(r.id);renderReceipts(false);toast('הקבלה צורפה')}
+async function uploadReady(blob,type,name,preview){const btn=$('#f-save');if(btn)btn.disabled=true;
+  try{if(!S.assets)throw new Error('אין חיבור לשמירת קבצים');toast('מעלה קבלה…');const r=await S.assets.upload(blob,{type});freshUploads.push(r.id);let pid='';if(preview){try{const pv=await S.assets.upload(preview,{type:'image/jpeg'});pid=pv.id;freshUploads.push(pid)}catch(e){}}draftReceipts.push(pid?{id:r.id,type:r.contentType||type,name,preview:pid}:{id:r.id,type:r.contentType||type,name});renderReceipts(false);toast('הקבלה צורפה')}
   catch(err){showErr('העלאת הקבלה נכשלה: '+((err&&err.message)||err||'שגיאה לא ידועה'))}if(btn)btn.disabled=false}
 function scanOpen(file){const url=URL.createObjectURL(file),im=new Image();
   im.onload=()=>{URL.revokeObjectURL(url);const s=Math.min(1,3000/Math.max(im.naturalWidth,im.naturalHeight));
@@ -644,7 +685,7 @@ function scanStep1(){const ov=$('#scan');ov.hidden=false;
   <div class="scan-stage" id="sc-stage"><canvas id="sc-c"></canvas></div>
   <div class="scan-tools"><label class="scan-pdf"><input type="checkbox" id="sc-free" ${SC.free?'checked':''}> כל פינה בנפרד</label><span style="flex:1"></span><button type="button" class="chipbtn" id="sc-auto">זיהוי אוטומטי</button><button type="button" class="chipbtn" id="sc-full">כל התמונה</button></div>
   <div class="sig-acts"><button type="button" class="btn" id="sc-cancel">ביטול</button><span style="flex:1"></span><button type="button" class="btn primary" id="sc-next">המשך</button></div>`;
-  $('#sc-cancel').addEventListener('click',scanClose);
+  addX(ov,scanClose);$('#sc-cancel').addEventListener('click',scanClose);
   $('#sc-full').addEventListener('click',()=>{SC.q=[{x:0,y:0},{x:SC.W,y:0},{x:SC.W,y:SC.H},{x:0,y:SC.H}];scDraw()});
   $('#sc-auto').addEventListener('click',()=>{const q=detectQuad(SC.src);SC.q=SC.free?q:toRect(q);scDraw()});
   $('#sc-free').addEventListener('change',ev=>{SC.free=ev.target.checked;if(!SC.free)SC.q=toRect(SC.q);ov.querySelector('.sig-top span').textContent=SC.free?'גררו כל פינה למקומה':'גררו פינה או צלע לסימון הקבלה';scDraw()});
@@ -722,7 +763,7 @@ function scanStep2(){const ov=$('#scan');
   <div class="scan-modes" role="group" aria-label="סוג עיבוד"><button type="button" class="chipbtn" data-m="doc">מסמך (שחור-לבן)</button><button type="button" class="chipbtn" data-m="color">צבע משופר</button><button type="button" class="chipbtn" data-m="orig">מקורי</button><button type="button" class="chipbtn" id="sc-rot">↻ סיבוב</button></div>
   <label class="scan-pdf"><input type="checkbox" id="sc-pdf" ${SC.pdf?'checked':''}> שמירה כקובץ PDF</label>
   <div class="sig-acts"><button type="button" class="btn" id="sc-back">חזרה לחיתוך</button><span style="flex:1"></span><button type="button" class="btn primary" id="sc-ok">צירוף לקבלות</button></div>`;
-  $('#sc-back').addEventListener('click',scanStep1);
+  addX(ov,scanClose);$('#sc-back').addEventListener('click',scanStep1);
   $$('#scan [data-m]').forEach(b=>b.addEventListener('click',()=>{SC.mode=b.dataset.m;scRender()}));
   $('#sc-rot').addEventListener('click',()=>{SC.rot=(SC.rot+1)%4;scRender()});
   $('#sc-pdf').addEventListener('change',ev=>{SC.pdf=ev.target.checked;scSize()});
@@ -742,7 +783,7 @@ async function scanConfirm(){const b=$('#sc-ok');b.disabled=true;b.textContent='
       const w=SC.final.width,h=SC.final.height,pw=210,ph=Math.round(Math.max(40,210*h/w)*100)/100;
       const pdf=new window.jspdf.jsPDF({unit:'mm',format:pw>ph?[ph,pw]:[pw,ph],orientation:pw>ph?'l':'p'});
       const du=await new Promise((r,j)=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.onerror=()=>j(fr.error);fr.readAsDataURL(jpg)});
-      pdf.addImage(du,'JPEG',0,0,pw,ph);const pb=pdf.output('blob');scanClose();await uploadReady(pb,'application/pdf','סריקה '+stamp+'.pdf')}
+      pdf.addImage(du,'JPEG',0,0,pw,ph);const pb=pdf.output('blob');scanClose();await uploadReady(pb,'application/pdf','סריקה '+stamp+'.pdf',jpg)}
     else{scanClose();await uploadReady(jpg,'image/jpeg','סריקה '+stamp+'.jpg')}}
   catch(e){b.disabled=false;b.textContent='צירוף לקבלות';toast('השמירה נכשלה ב'+step+': '+((e&&e.message)||e||'שגיאה לא ידועה'))}}
 window.addEventListener('resize',()=>{if(!$('#scan').hidden&&$('#sc-c')){scLayout();scDraw()}});
