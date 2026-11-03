@@ -171,6 +171,7 @@ a.btn{text-decoration:none}
 </style>
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="version.js"></script>
 <script src="backend.js"></script>
 </head>
 <body>
@@ -290,6 +291,7 @@ a.btn{text-decoration:none}
       <div><b style="font-size:1.05rem">חשבון ושרת</b><div style="color:var(--muted);font-size:.92rem" id="acc-who"></div></div>
       <div style="color:var(--muted);font-size:.92rem">כל הנתונים והקבלות נשמרים בשרת Supabase שלך. אם האפליקציה לא נטענת אחרי תקופה בלי שימוש, השרת כנראה הושהה: לחצו על "פתיחת ניהול השרת", התחברו, ולחצו Restore project. הוספת עובד חדש נעשית שם בלשונית Authentication.</div>
       <div class="row"><a class="btn primary" id="acc-dash" target="_blank" rel="noopener">פתיחת ניהול השרת (Supabase)</a><button class="btn" id="acc-out">התנתקות</button></div>
+      <div id="app-ver" style="color:var(--muted);font-size:.85rem"></div>
     </div>
   </section>
 </div>
@@ -886,6 +888,7 @@ $('#s-save').addEventListener('click',async()=>{const d={lastBackup:S.settings.l
 /* ---------- account ---------- */
 $('#acc-dash').href=(window.Backend&&Backend.dashboardUrl)||'https://supabase.com/dashboard';
 $('#acc-out').addEventListener('click',()=>window.Backend&&Backend.signOut());
+$('#app-ver').textContent='גרסה '+(window.APP_VERSION||'—');
 window.addEventListener('backend-status',ev=>{if(ev.detail.ok){setStatus('')}else{const st=$('#status');st.hidden=false;st.className='notice warn';st.innerHTML='אין חיבור לשרת. בדקו אינטרנט. אם זה נמשך, ייתכן שהשרת הושהה – <a href="'+esc((window.Backend&&Backend.dashboardUrl)||'#')+'" target="_blank" rel="noopener" style="color:inherit;font-weight:700">לחצו כאן לשחזור (Restore)</a>.'}});
 
 /* ---------- boot ---------- */
