@@ -100,9 +100,18 @@ textarea{min-height:70px;resize:vertical}
 .bld{display:grid;gap:8px}
 .bld-h{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding-top:6px}
 .bld-h h2{font-family:var(--f-display);font-weight:400;font-size:1.25rem;margin:0}
-.apts{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
-.apt{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:10px;align-content:start}
-.apt h3{margin:0;font-size:1.05rem;display:flex;justify-content:space-between;gap:8px}
+.apts{display:grid;gap:6px}
+.apt{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.apt>summary{list-style:none;display:flex;align-items:center;gap:10px;padding:10px 12px;min-height:48px;cursor:pointer}
+.apt>summary::-webkit-details-marker{display:none}
+.apt>summary:hover{background:var(--surface-2)}
+.apt .s-main{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.apt .s-sub{color:var(--muted)}
+.apt .s-amt{color:var(--accent);font-weight:700;font-size:.92rem}
+.apt .chev{color:var(--muted);font-size:1.1rem;line-height:1;transition:transform .15s}
+.apt[open] .chev{transform:rotate(180deg)}
+.apt-body{display:grid;gap:10px;padding:10px 12px 12px;border-top:1px solid var(--line)}
+.apt .addr{font-size:.82rem;color:var(--muted)}
 .apt dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:.92rem}
 .apt dt{color:var(--muted)}
 .apt dd{margin:0;min-width:0;overflow-wrap:anywhere}
@@ -333,7 +342,7 @@ const DEFAULT_CATS=['תיקונים קלים','הוצאות משרד','אינס�
 
 const S={db:null,assets:null,dl:null,user:null,uid:null,canWrite:true,
   apts:{},exps:[],settings:{vatRate:18,categories:DEFAULT_CATS.slice(),ownerName:'',managerName:''},
-  names:{},tab:'exp',loaded:{a:false,e:false}};
+  names:{},openApts:new Set(),tab:'exp',loaded:{a:false,e:false}};
 
 function toast(msg){const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>t.hidden=true,2600)}
 function setStatus(msg,warn){const s=$('#status');if(!msg){s.hidden=true;return}s.hidden=false;s.textContent=msg;s.className='notice'+(warn?' warn':'')}
@@ -392,7 +401,7 @@ function renderExp(){
 }
 
 /* ---------- sheet ---------- */
-function openSheet(html){$('#sheet-card').innerHTML=html;addX($('#sheet-card'),cancelExpense);$('#sheet').hidden=false;document.body.style.overflow='hidden'}
+function openSheet(html){$('#sheet-card').innerHTML=html;addX($('#sheet-card'),cancelExpense);$('#sheet').hidden=false;$('#sheet-card').scrollTop=0;document.body.style.overflow='hidden'}
 function closeSheet(){$('#sheet').hidden=true;document.body.style.overflow=''}
 $('#sheet').addEventListener('click',e=>{if(e.target.id==='sheet')cancelExpense()});
 let draftReceipts=[],freshUploads=[];
@@ -800,9 +809,12 @@ function renderApts(){
   el.innerHTML=blds.map(b=>{const items=entries.filter(([,a])=>a.building===b);const t=sum(S.exps.filter(e=>bldOf(e)===b));
     return `<div class="bld"><div class="bld-h"><h2>${esc(b||'ללא בניין')}</h2><div class="row"><span class="num" style="color:var(--muted);font-size:.9rem">${money(t.gross)} · ${t.n} הוצאות</span><button class="btn sm" data-hist-b="${esc(b)}">היסטוריית בניין</button><button class="btn sm" data-print-b="${esc(b)}">הדפסת היסטוריה</button></div></div>
     <div class="apts">${items.map(([id,a])=>{const ta=sum(S.exps.filter(e=>e.aptId===id));const row=(k,v,c)=>v?`<dt>${k}</dt><dd>${c?`<span class="num">${esc(v)}</span><button class="copy" data-copy="${esc(v)}">העתקה</button>`:esc(v)}</dd>`:'';
-      return `<div class="apt"><h3><span>דירה ${esc(a.aptNo)}${a.floor?` <small style="color:var(--muted);font-weight:500">קומה ${esc(a.floor)}</small>`:''}</span><span class="num" style="color:var(--accent)">${money(ta.gross)}</span></h3>
+      const addr=[a.building,'דירה '+a.aptNo,a.floor?'קומה '+a.floor:''].filter(Boolean).join(', ');
+      return `<details class="apt" data-aid="${esc(id)}" ${S.openApts.has(id)?'open':''}><summary><span class="s-main"><b>דירה ${esc(a.aptNo)}</b>${a.floor?`<span class="s-sub"> · קומה ${esc(a.floor)}</span>`:''}${a.tenantName?`<span class="s-sub"> · ${esc(a.tenantName)}</span>`:''}</span><span class="chev" aria-hidden="true">⌄</span></summary>
+      <div class="apt-body"><div class="addr">${esc(addr)}</div><div class="s-amt">סה"כ הוצאות: <span class="num">${money(ta.gross)}</span> · ${ta.n} הוצאות</div>
       <dl>${row('דייר',a.tenantName)}${row('טלפון',a.phone,1)}${row('טלפון נוסף',a.phone2,1)}${row('מונה מים',a.waterMeter,1)}${row('מונה חשמל',a.elecMeter,1)}${row('חוזה חשמל',a.elecContract,1)}${row('מונה גז',a.gasMeter,1)}${row('הערות',a.notes)}</dl>
-      <div class="acts">${S.canWrite?`<button class="btn ghost sm" data-edit="${esc(id)}">עריכה</button>`:''}<button class="btn ghost sm" data-hist="${esc(id)}">היסטוריה</button><button class="btn ghost sm" data-print="${esc(id)}">הדפסה</button>${S.canWrite?`<button class="btn ghost sm danger" data-del="${esc(id)}">מחיקה</button>`:''}</div></div>`}).join('')}</div></div>`}).join('');
+      <div class="acts">${S.canWrite?`<button class="btn ghost sm" data-edit="${esc(id)}">עריכה</button>`:''}<button class="btn ghost sm" data-hist="${esc(id)}">היסטוריה</button><button class="btn ghost sm" data-print="${esc(id)}">הדפסה</button>${S.canWrite?`<button class="btn ghost sm danger" data-del="${esc(id)}">מחיקה</button>`:''}</div></div></details>`}).join('')}</div></div>`}).join('');
+  el.querySelectorAll('details.apt').forEach(d=>d.addEventListener('toggle',()=>{if(d.open)S.openApts.add(d.dataset.aid);else S.openApts.delete(d.dataset.aid)}));
   el.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>openApt(b.dataset.edit)));
   el.querySelectorAll('[data-hist]').forEach(b=>b.addEventListener('click',()=>goHist({apt:b.dataset.hist})));
   el.querySelectorAll('[data-hist-b]').forEach(b=>b.addEventListener('click',()=>goHist({bld:b.dataset.histB})));
