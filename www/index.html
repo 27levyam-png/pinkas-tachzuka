@@ -23,6 +23,9 @@
 .about-icon{width:56px;height:56px;border-radius:12px}
 .bsd{font-weight:700;align-self:flex-start;font-size:.9rem}
 #d-stat:empty{display:none}
+.unit{border:1px solid var(--line);border-radius:8px;padding:8px 10px;display:grid;gap:6px;background:var(--surface-2)}
+.unit-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.unit-ed{border:1px solid var(--line);border-radius:10px;padding:10px;display:grid;gap:8px;background:var(--surface)}
 </style>
 <title>פנקס הוצאות תחזוקה</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -373,12 +376,19 @@ function calcVat(amount,mode,rate){amount=+amount||0;const r=(+rate||0)/100;
   if(mode==='none')return{gross:r2(amount),vat:0,net:r2(amount)};
   if(mode==='plus'){const vat=r2(amount*r);return{gross:r2(amount+vat),vat,net:r2(amount)}}
   const net=r2(amount/(1+r));return{gross:r2(amount),vat:r2(amount-net),net}}
+function unitsOf(a){return a&&a.divided&&Array.isArray(a.units)?a.units:[]}
+function unitObj(aptId,uid){return uid?unitsOf(S.apts[aptId]).find(x=>x.id===uid)||null:null}
+function unitName(aptId,uid,fallback){const u=unitObj(aptId,uid);return u?(u.name||'יחידה'):(fallback||'')}
+function splitScope(s){s=String(s||'');const i=s.indexOf('|');return i<0?[s,'']:[s.slice(0,i),s.slice(i+1)]}
+function unitSelHTML(aptId,sel){return '<option value="">כל הדירה</option>'+unitsOf(S.apts[aptId]).map(u=>`<option value="${esc(u.id)}" ${sel===u.id?'selected':''}>${esc(u.name||'יחידה')}${u.tenantName?' – '+esc(u.tenantName):''}</option>`).join('')}
+function bindUnitSel(aptSel,wrap,sel,cur){if(!aptSel||!wrap||!sel)return;const upd=()=>{wrap.hidden=!unitsOf(S.apts[aptSel.value]).length;sel.innerHTML=unitSelHTML(aptSel.value,cur)};aptSel.addEventListener('change',()=>{cur='';upd()});upd()}
+function unitPick(){const w=$('#w-unit');return w&&!w.hidden?$('#f-unit').value:''}
 function aptLabel(e){ // e: expense
   if(e.aptId==='office')return 'הוצאות משרד';
   if(e.aptId&&e.aptId.startsWith('bld:'))return (e.aptId.slice(4))+' · שטח משותף';
-  const a=S.apts[e.aptId];if(a)return a.building+' · דירה '+a.aptNo;
-  return e.aptLabel||'—'}
-function aptShort(e){if(e.aptId==='office')return 'משרד';if(e.aptId&&e.aptId.startsWith('bld:'))return 'שטח משותף';const a=S.apts[e.aptId];if(a)return 'דירה '+a.aptNo+(a.tenantName?' – '+a.tenantName:'');return e.aptLabel||''}
+  const a=S.apts[e.aptId],un=e.unitId?' · '+unitName(e.aptId,e.unitId,e.unitLabel||'יחידה'):'';if(a)return a.building+' · דירה '+a.aptNo+un;
+  return (e.aptLabel||'—')+un}
+function aptShort(e){if(e.aptId==='office')return 'משרד';if(e.aptId&&e.aptId.startsWith('bld:'))return 'שטח משותף';const a=S.apts[e.aptId];if(a){if(e.unitId){const u=unitObj(e.aptId,e.unitId);return 'דירה '+a.aptNo+' · '+(u?u.name:(e.unitLabel||'יחידה'))+(u&&u.tenantName?' – '+u.tenantName:'')}return 'דירה '+a.aptNo+(a.tenantName?' – '+a.tenantName:'')}return e.aptLabel||''}
 function bldOf(e){if(e.aptId==='office')return 'משרד';if(e.aptId&&e.aptId.startsWith('bld:'))return e.aptId.slice(4);const a=S.apts[e.aptId];return a?a.building:(e.building||'')}
 function buildings(){return [...new Set(Object.values(S.apts).map(a=>a.building).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'he'))}
 function aptsSorted(){return Object.entries(S.apts).sort((x,y)=>(x[1].building||'').localeCompare(y[1].building||'','he')||String(x[1].aptNo).localeCompare(String(y[1].aptNo),'he',{numeric:true}))}
@@ -441,6 +451,7 @@ function openExpense(id){
   <form id="ef" class="list" novalidate>
    <div class="two"><label class="fld">תאריך<input type="date" id="f-date" required value="${esc(e?e.date:today())}"></label>
     <label class="fld">דירה<select id="f-apt" required>${aptOptions(e?e.aptId:'')}</select></label></div>
+   <label class="fld" id="w-unit" hidden>יחידה בדירה המחולקת<select id="f-unit"></select></label>
    <div class="two"><label class="fld">סוג הוצאה<select id="f-cat">${cats.map(c=>`<option ${e&&e.category===c?'selected':''}>${esc(c)}</option>`).join('')}</select></label>
     <label class="fld" id="w-con">מי עשה את העבודה<input id="f-con" list="f-conlist" value="${esc(e?e.contractor:'')}" placeholder="שם בעל המקצוע / החברה"><datalist id="f-conlist">${contractors().map(c=>`<option value="${esc(c)}">`).join('')}</datalist><button type="button" class="linkbtn" id="f-self">ללא בעל מקצוע</button></label></div>
    <label class="fld" id="w-desc">מהות העבודה<input id="f-desc" value="${esc(e?e.description:'')}" placeholder="לדוגמה: החלפת ברז במטבח"></label>
@@ -462,6 +473,7 @@ function openExpense(id){
    ${e&&(e.createdBy||e.updatedBy)?`<div style="color:var(--muted);font-size:.82rem">${nameOf(e.createdBy)?'נרשם ע"י '+esc(nameOf(e.createdBy)):''}${e.updatedBy&&e.updatedBy!==e.createdBy&&nameOf(e.updatedBy)?' · עודכן ע"י '+esc(nameOf(e.updatedBy)):''}</div>`:''}
   </form>`);
   $('#f-war').addEventListener('change',()=>{$('#f-war-box').hidden=!$('#f-war').checked;if($('#f-war').checked&&!$('#f-wprod').value)$('#f-wprod').value=$('#f-desc').value});
+  bindUnitSel($('#f-apt'),$('#w-unit'),$('#f-unit'),e?e.unitId||'':'');
   if(e)$('#f-vm').value=e.vatMode||'incl';
   if(ro)$$('#ef input,#ef select,#ef textarea').forEach(i=>i.disabled=true);
   const upd=()=>{const c=calcVat($('#f-amount').value,$('#f-vm').value,S.settings.vatRate);$('#f-calc').innerHTML=`נטו: <b class="num">${money(c.net)}</b> מע"מ (${S.settings.vatRate}%): <b class="num">${money(c.vat)}</b> סה"כ: <b class="num">${money(c.gross)}</b>`};
@@ -530,7 +542,7 @@ async function saveExpense(old){
   if(!date)return showErr('נא לבחור תאריך.');if(!aptId)return showErr('נא לבחור דירה או שטח משותף.');if(!(+amount>0))return showErr('נא להזין סכום.');
   const vm=$('#f-vm').value,c=calcVat(amount,vm,S.settings.vatRate);const a=S.apts[aptId];
   const doc={date,aptId,building:aptId==='office'?'משרד':aptId.startsWith('bld:')?aptId.slice(4):(a?a.building:''),aptLabel:aptId==='office'?'הוצאות משרד':aptId.startsWith('bld:')?aptId.slice(4)+' · שטח משותף':(a?a.building+' · דירה '+a.aptNo:''),
-    category:$('#f-cat').value,contractor:$('#w-con').hidden?'':$('#f-con').value.trim(),description:$('#w-desc').hidden?'':$('#f-desc').value.trim(),
+    unitId:unitPick(),unitLabel:unitPick()?$('#f-unit').selectedOptions[0].text.split(' – ')[0]:'',category:$('#f-cat').value,contractor:$('#w-con').hidden?'':$('#f-con').value.trim(),description:$('#w-desc').hidden?'':$('#f-desc').value.trim(),
     amountEntered:r2(amount),vatMode:vm,vatRate:+S.settings.vatRate,gross:c.gross,vat:c.vat,net:c.net,invoiceNo:$('#f-inv').value.trim(),
     status:$('#f-st').value,refundedAt:$('#f-st').value==='refunded'?(old&&old.refundedAt||today()):'',notes:$('#f-notes').value.trim(),receipts:draftReceipts,
     createdAt:old?old.createdAt||Date.now():Date.now(),createdBy:old?(old.createdBy||''):(S.uid||''),updatedAt:Date.now(),updatedBy:S.uid||''};
@@ -538,7 +550,7 @@ async function saveExpense(old){
   try{const ref=old?S.db.doc('expenses/'+old.id):S.db.collection('expenses').doc();await ref.set(doc);
     const wid='exp-'+ref.id,hadW=S.adocs.some(x=>x.id===wid);
     if($('#f-war').checked){const wm=+$('#f-wm').value||12,oldW=S.adocs.find(x=>x.id===wid);
-      try{await S.db.doc('adocs/'+wid).set({aptId,type:'warranty',date,product:$('#f-wprod').value.trim()||doc.description||doc.category,vendor:doc.contractor,warrantyMonths:wm,expiry:addMonths(date,wm),notes:(oldW&&oldW.notes)||'נוצר מקבלה של הוצאה',receipts:draftReceipts,fromExpense:ref.id,createdAt:oldW?oldW.createdAt||Date.now():Date.now(),createdBy:oldW?(oldW.createdBy||''):(S.uid||''),updatedAt:Date.now(),updatedBy:S.uid||''})}catch(err){toast('ההוצאה נשמרה, אבל רישום האחריות נכשל')}}
+      try{await S.db.doc('adocs/'+wid).set({aptId,unitId:doc.unitId||'',type:'warranty',date,product:$('#f-wprod').value.trim()||doc.description||doc.category,vendor:doc.contractor,warrantyMonths:wm,expiry:addMonths(date,wm),notes:(oldW&&oldW.notes)||'נוצר מקבלה של הוצאה',receipts:draftReceipts,fromExpense:ref.id,createdAt:oldW?oldW.createdAt||Date.now():Date.now(),createdBy:oldW?(oldW.createdBy||''):(S.uid||''),updatedAt:Date.now(),updatedBy:S.uid||''})}catch(err){toast('ההוצאה נשמרה, אבל רישום האחריות נכשל')}}
     else if(hadW){try{await S.db.doc('adocs/'+wid).delete()}catch(err){}}
     if(old&&S.assets){(old.receipts||[]).filter(r=>!draftReceipts.some(d=>d.id===r.id)).forEach(r=>[r.id,r.preview].filter(Boolean).filter(id=>assetFree(id,old)).forEach(id=>S.assets.delete(id).catch(()=>{})))}
     freshUploads=[];closeSheet();toast(old?'ההוצאה עודכנה':'ההוצאה נשמרה');if(!old){$('#e-month').value=date.slice(0,7);renderExp()}}
@@ -621,7 +633,7 @@ function openInternal(){
   <div class="notice" style="margin:0">הקבלה תצורף להוצאה כקובץ PDF.</div>
   <div class="two"><label class="fld">תאריך<input type="date" id="ir-date" value="${esc($('#f-date').value||today())}"></label><label class="fld">מספר קבלה<input id="ir-no" value="${esc(no)}"></label></div>
   <label class="fld">כתובת<input id="ir-addr" value="${esc(office?'':common?aptId.slice(4):(a?a.building:''))}"></label>
-  <div class="two"><label class="fld">דירה<input id="ir-apt" value="${esc(office?'משרד':common?'שטח משותף':(a?a.aptNo:''))}"></label><label class="fld">דייר<input id="ir-ten" value="${esc(a?a.tenantName||'':'')}"></label></div>
+  <div class="two"><label class="fld">דירה<input id="ir-apt" value="${esc(office?'משרד':common?'שטח משותף':(a?a.aptNo+(unitObj(aptId,unitPick())?' · '+unitObj(aptId,unitPick()).name:''):''))}"></label><label class="fld">דייר<input id="ir-ten" value="${esc(unitObj(aptId,unitPick())?unitObj(aptId,unitPick()).tenantName||'':(a?a.tenantName||'':''))}"></label></div>
   <label class="fld">מי תיקן<input id="ir-con" value="${esc($('#f-con').value)}"></label>
   <label class="fld">מהות התקלה<textarea id="ir-desc">${esc($('#f-desc').value)}</textarea></label>
   <label class="fld">סכום ששולם (₪)<input type="number" id="ir-amt" inputmode="decimal" step="0.01" min="0" value="${esc($('#f-amount').value)}"></label>
@@ -834,7 +846,7 @@ $('#a-q').addEventListener('input',renderApts);
 $('#a-add').addEventListener('click',()=>openApt(null));
 function renderApts(){{const al=docAlert(S.adocs),b=$('#a-docs');if(b)b.textContent='📁 כל המסמכים'+(al.e+al.s?` (⚠ ${al.e+al.s})`:'')}
   const q=$('#a-q').value.trim().toLowerCase(),el=$('#a-list');
-  const entries=aptsSorted().filter(([,a])=>!q||Object.values(a).some(v=>String(v||'').toLowerCase().includes(q)));
+  const entries=aptsSorted().filter(([,a])=>!q||JSON.stringify(a).toLowerCase().includes(q));
   if(!Object.keys(S.apts).length){el.innerHTML=`<div class="empty"><b>עדיין אין דירות</b>הוסיפו כל דירה עם הבניין, פרטי הדייר, טלפונים ומספרי המונים (מים, חשמל, גז). ההוצאות ישויכו אליהן.</div>`;return}
   if(!entries.length){el.innerHTML='<div class="empty"><b>לא נמצאו דירות</b>נסו חיפוש אחר.</div>';return}
   const blds=[...new Set(entries.map(([,a])=>a.building))];
@@ -842,9 +854,9 @@ function renderApts(){{const al=docAlert(S.adocs),b=$('#a-docs');if(b)b.textCont
     return `<div class="bld"><div class="bld-h"><h2>${esc(b||'ללא בניין')}</h2><div class="row"><span class="num" style="color:var(--muted);font-size:.9rem">${money(t.gross)} · ${t.n} הוצאות</span><button class="btn sm" data-docs="bld:${esc(b)}">📁 מסמכי בניין</button><button class="btn sm" data-hist-b="${esc(b)}">היסטוריית בניין</button><button class="btn sm" data-print-b="${esc(b)}">הדפסת היסטוריה</button></div></div>
     <div class="apts">${items.map(([id,a])=>{const ta=sum(S.exps.filter(e=>e.aptId===id));const row=(k,v,c)=>v?`<dt>${k}</dt><dd>${c?`<span class="num">${esc(v)}</span><button class="copy" data-copy="${esc(v)}">העתקה</button>`:esc(v)}</dd>`:'';
       const addr=[a.building,'דירה '+a.aptNo,a.floor?'קומה '+a.floor:''].filter(Boolean).join(', ');
-      return `<details class="apt" data-aid="${esc(id)}" ${S.openApts.has(id)?'open':''}><summary><span class="s-main"><b>דירה ${esc(a.aptNo)}</b>${a.floor?`<span class="s-sub"> · קומה ${esc(a.floor)}</span>`:''}${a.tenantName?`<span class="s-sub"> · ${esc(a.tenantName)}</span>`:''}</span>${(()=>{const al=docAlert(docsOf(id));return al.e+al.s?`<span class="s-warn" title="מסמכים שפג תוקפם או עומדים לפוג">⚠ ${al.e+al.s}</span>`:''})()}<span class="chev" aria-hidden="true">⌄</span></summary>
+      return `<details class="apt" data-aid="${esc(id)}" ${S.openApts.has(id)?'open':''}><summary><span class="s-main"><b>דירה ${esc(a.aptNo)}</b>${a.floor?`<span class="s-sub"> · קומה ${esc(a.floor)}</span>`:''}${unitsOf(a).length?`<span class="s-sub"> · מחולקת ל-${unitsOf(a).length}${unitsOf(a).some(u=>u.tenantName)?': '+esc(unitsOf(a).map(u=>u.tenantName).filter(Boolean).join(', ')):''}</span>`:(a.tenantName?`<span class="s-sub"> · ${esc(a.tenantName)}</span>`:'')}</span>${(()=>{const al=docAlert(docsOf(id));return al.e+al.s?`<span class="s-warn" title="מסמכים שפג תוקפם או עומדים לפוג">⚠ ${al.e+al.s}</span>`:''})()}<span class="chev" aria-hidden="true">⌄</span></summary>
       <div class="apt-body"><div class="addr">${esc(addr)}</div><div class="s-amt">סה"כ הוצאות: <span class="num">${money(ta.gross)}</span> · ${ta.n} הוצאות</div>
-      <dl>${row('דייר',a.tenantName)}${row('טלפון',a.phone,1)}${row('טלפון נוסף',a.phone2,1)}${row('מונה מים',a.waterMeter,1)}${row('מונה חשמל',a.elecMeter,1)}${row('חוזה חשמל',a.elecContract,1)}${row('מונה גז',a.gasMeter,1)}${row('הערות',a.notes)}</dl>
+      <dl>${row('דייר',a.tenantName)}${row('טלפון',a.phone,1)}${row('טלפון נוסף',a.phone2,1)}${row('מונה מים',a.waterMeter,1)}${row('מונה חשמל',a.elecMeter,1)}${row('חוזה חשמל',a.elecContract,1)}${row('מונה גז',a.gasMeter,1)}${row('הערות',a.notes)}</dl>${unitsOf(a).map(u=>{const tu=sum(S.exps.filter(e=>e.aptId===id&&e.unitId===u.id));return `<div class="unit"><div class="unit-h"><b>${esc(u.name||'יחידה')}</b><span class="num" style="color:var(--muted);font-size:.85rem">${money(tu.gross)} · ${tu.n} הוצאות</span></div><dl>${row('דייר',u.tenantName)}${row('טלפון',u.phone,1)}${row('טלפון נוסף',u.phone2,1)}${row('מונה מים משני',u.waterSub,1)}${row('מונה חשמל משני',u.elecSub,1)}${row('הערות',u.notes)}</dl><div class="acts"><button class="btn ghost sm" data-docs="${esc(id+'|'+u.id)}">📁 מסמכים (${docsOf(id+'|'+u.id).length})</button><button class="btn ghost sm" data-hist="${esc(id+'|'+u.id)}">היסטוריה</button></div></div>`}).join('')}
       <div class="acts"><button class="btn ghost sm" data-docs="${esc(id)}">📁 מסמכים (${docsOf(id).length})</button>${S.canWrite?`<button class="btn ghost sm" data-edit="${esc(id)}">עריכה</button>`:''}<button class="btn ghost sm" data-hist="${esc(id)}">היסטוריה</button><button class="btn ghost sm" data-print="${esc(id)}">הדפסה</button>${S.canWrite?`<button class="btn ghost sm danger" data-del="${esc(id)}">מחיקה</button>`:''}</div></div></details>`}).join('')}</div></div>`}).join('');
   el.querySelectorAll('details.apt').forEach(d=>d.addEventListener('toggle',()=>{if(d.open)S.openApts.add(d.dataset.aid);else S.openApts.delete(d.dataset.aid)}));
   el.querySelectorAll('[data-docs]').forEach(b=>b.addEventListener('click',ev=>{ev.preventDefault();openDocs(b.dataset.docs)}));
@@ -857,18 +869,30 @@ function renderApts(){{const al=docAlert(S.adocs),b=$('#a-docs');if(b)b.textCont
   el.querySelectorAll('[data-copy]').forEach(b=>b.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(b.dataset.copy);toast('הועתק')}catch(e){const r=document.createRange();r.selectNodeContents(b.previousElementSibling);const s=getSelection();s.removeAllRanges();s.addRange(r)}}));
 }
 function openApt(id){const a=id?S.apts[id]:{};const f=(k,l,ph,t)=>`<label class="fld">${l}<input id="a-${k}" ${t?`inputmode="${t}"`:''} value="${esc(a[k]||'')}" placeholder="${esc(ph||'')}"></label>`;
+  let units=unitsOf(a).map(u=>Object.assign({},u));
+  const UF=[['name','שם היחידה'],['tenantName','שם הדייר'],['phone','טלפון','tel'],['phone2','טלפון נוסף','tel'],['waterSub','מונה מים משני (אם יש)','numeric'],['elecSub','מונה חשמל משני (אם יש)','numeric'],['notes','הערות']];
   openSheet(`<h2>${id?'עריכת דירה':'דירה חדשה'}</h2><form id="af" class="list" novalidate>
   <div class="two"><label class="fld">בניין (שם או כתובת)<input id="a-building" list="a-bl" value="${esc(a.building||'')}" placeholder="לדוגמה: רחוב הרב קוק 12"><datalist id="a-bl">${buildings().map(b=>`<option value="${esc(b)}">`).join('')}</datalist></label>${f('aptNo','מספר דירה','','text')}</div>
-  <div class="two">${f('floor','קומה')}${f('tenantName','שם הדייר')}</div>
-  <div class="two">${f('phone','טלפון','','tel')}${f('phone2','טלפון נוסף','','tel')}</div>
+  <div class="two">${f('floor','קומה')}<span></span></div>
+  <label class="scan-pdf"><input type="checkbox" id="a-div" ${units.length?'checked':''}> דירה מחולקת (כמה יחידות ודיירים באותה דירה)</label>
+  <div id="a-single" class="list" ${units.length?'hidden':''}><div class="two">${f('tenantName','שם הדייר')}${f('phone','טלפון','','tel')}</div><div class="two">${f('phone2','טלפון נוסף','','tel')}<span></span></div></div>
+  <div id="a-multi" class="list" ${units.length?'':'hidden'}><label class="fld">מספר יחידות<select id="a-ucount">${[2,3,4,5,6].map(n=>`<option value="${n}" ${n===Math.max(2,units.length)?'selected':''}>${n}</option>`).join('')}</select></label><div id="a-units" class="list"></div></div>
+  <div class="fld" style="color:var(--muted);font-weight:600;font-size:.85rem" id="a-mlabel">${units.length?'מונים ראשיים של הדירה':'מונים'}</div>
   <div class="two">${f('waterMeter','מספר מונה מים','','numeric')}${f('elecMeter','מספר מונה חשמל','','numeric')}</div>
   <div class="two">${f('elecContract','מספר חוזה חברת החשמל','','numeric')}${f('gasMeter','מספר מונה גז','','numeric')}</div>
   <label class="fld">פרטים והערות<textarea id="a-notes">${esc(a.notes||'')}</textarea></label>
   <div class="foot"><span></span><div class="row"><button type="button" class="btn" id="a-cancel">ביטול</button><button class="btn primary" id="a-save">שמירה</button></div></div>
   <div class="notice" id="f-err" hidden></div></form>`);
+  const grab=()=>{$$('#a-units .unit-ed').forEach((el,i)=>{if(units[i])UF.forEach(([k])=>{units[i][k]=el.querySelector('[data-uf="'+k+'"]').value.trim()})})};
+  const draw=()=>{const n=+$('#a-ucount').value;while(units.length<n){let k=units.length+1,uid;do{uid='u'+(k++)}while(units.some(x=>x.id===uid));units.push({id:uid,name:'יחידה '+(units.length+1)})}
+    $('#a-units').innerHTML=units.slice(0,n).map((u,i)=>`<div class="unit-ed"><b>${esc(u.name||'יחידה '+(i+1))}</b><div class="grid-f">${UF.map(([k,l,t])=>`<label class="fld">${l}<input data-uf="${k}" ${t?`inputmode="${t}"`:''} value="${esc(u[k]||'')}"></label>`).join('')}</div></div>`).join('')};
+  $('#a-div').addEventListener('change',()=>{const on=$('#a-div').checked;$('#a-single').hidden=on;$('#a-multi').hidden=!on;$('#a-mlabel').textContent=on?'מונים ראשיים של הדירה':'מונים';
+    if(on){grab();if(!units.length){draw();const t=$('#a-tenantName').value.trim(),p1=$('#a-phone').value.trim(),p2=$('#a-phone2').value.trim();if(t||p1||p2){Object.assign(units[0],{tenantName:t,phone:p1,phone2:p2});draw()}}}});
+  $('#a-ucount').addEventListener('change',()=>{grab();draw()});if(units.length)draw();
   $('#a-cancel').addEventListener('click',closeSheet);
-  $('#af').addEventListener('submit',async ev=>{ev.preventDefault();const g=k=>$('#a-'+k).value.trim();
-    const d={building:g('building'),aptNo:g('aptNo'),floor:g('floor'),tenantName:g('tenantName'),phone:g('phone'),phone2:g('phone2'),waterMeter:g('waterMeter'),elecMeter:g('elecMeter'),elecContract:g('elecContract'),gasMeter:g('gasMeter'),notes:$('#a-notes').value.trim(),updatedAt:Date.now()};
+  $('#af').addEventListener('submit',async ev=>{ev.preventDefault();const g=k=>$('#a-'+k).value.trim();grab();const div=$('#a-div').checked,n=+$('#a-ucount').value;
+    const d={building:g('building'),aptNo:g('aptNo'),floor:g('floor'),tenantName:div?'':g('tenantName'),phone:div?'':g('phone'),phone2:div?'':g('phone2'),waterMeter:g('waterMeter'),elecMeter:g('elecMeter'),elecContract:g('elecContract'),gasMeter:g('gasMeter'),notes:$('#a-notes').value.trim(),
+      divided:div,units:div?units.slice(0,n).map((u,i)=>({id:u.id,name:u.name||('יחידה '+(i+1)),tenantName:u.tenantName||'',phone:u.phone||'',phone2:u.phone2||'',waterSub:u.waterSub||'',elecSub:u.elecSub||'',notes:u.notes||''})):[],updatedAt:Date.now()};
     if(!d.building||!d.aptNo)return showErr('נא למלא בניין ומספר דירה.');
     $('#a-save').disabled=true;try{await (id?S.db.doc('apartments/'+id):S.db.collection('apartments').doc()).set(d);closeSheet();toast('הדירה נשמרה')}catch(e){$('#a-save').disabled=false;showErr('השמירה נכשלה. נסו שוב.')}})}
 
@@ -880,14 +904,14 @@ $$('[data-range]').forEach(b=>b.addEventListener('click',()=>setRange(b.dataset.
 setRange('month');
 ['#r-from','#r-to','#r-apt','#r-cat','#r-con','#r-st','#r-grp'].forEach(s=>$(s).addEventListener('change',renderRep));
 $('#r-bld').addEventListener('change',()=>{$('#r-apt').value='';renderRep()});
-function goHist(o){$('#r-from').value='';$('#r-to').value='';fillRepSelects();$('#r-bld').value=o.bld||(o.apt&&S.apts[o.apt]?S.apts[o.apt].building:'');fillRepSelects();$('#r-apt').value=o.apt||'';$('#r-grp').value=o.apt?'category':'apt';showTab('rep')}
+function goHist(o){$('#r-from').value='';$('#r-to').value='';fillRepSelects();$('#r-bld').value=o.bld||(o.apt&&S.apts[splitScope(o.apt)[0]]?S.apts[splitScope(o.apt)[0]].building:'');fillRepSelects();$('#r-apt').value=o.apt||'';$('#r-grp').value=o.apt?'category':'apt';showTab('rep')}
 function fillRepSelects(){const keep=s=>$(s).value;const b=keep('#r-bld'),a=keep('#r-apt'),c=keep('#r-cat'),k=keep('#r-con');
   $('#r-bld').innerHTML='<option value="">כל הבניינים</option>'+(S.exps.some(e=>e.aptId==='office')?'<option value="משרד">הוצאות משרד</option>':'')+buildings().map(x=>`<option>${esc(x)}</option>`).join('');$('#r-bld').value=b;
-  const bv=$('#r-bld').value;$('#r-apt').innerHTML='<option value="">כל הדירות</option>'+(bv&&bv!=='משרד'?`<option value="bld:${esc(bv)}">שטח משותף</option>`:'')+aptsSorted().filter(([,x])=>!bv||x.building===bv).map(([id,x])=>`<option value="${esc(id)}">${bv?'':esc(x.building)+' · '}דירה ${esc(x.aptNo)}</option>`).join('');$('#r-apt').value=a;
+  const bv=$('#r-bld').value;$('#r-apt').innerHTML='<option value="">כל הדירות</option>'+(bv&&bv!=='משרד'?`<option value="bld:${esc(bv)}">שטח משותף</option>`:'')+aptsSorted().filter(([,x])=>!bv||x.building===bv).map(([id,x])=>`<option value="${esc(id)}">${bv?'':esc(x.building)+' · '}דירה ${esc(x.aptNo)}</option>`+unitsOf(x).map(u=>`<option value="${esc(id+'|'+u.id)}">${bv?'':esc(x.building)+' · '}דירה ${esc(x.aptNo)} · ${esc(u.name||'יחידה')}</option>`).join('')).join('');$('#r-apt').value=a;
   const cats=[...new Set([...S.settings.categories,...S.exps.map(e=>e.category).filter(Boolean)])];$('#r-cat').innerHTML='<option value="">כל הסוגים</option>'+cats.map(x=>`<option>${esc(x)}</option>`).join('');$('#r-cat').value=c;
   $('#r-con').innerHTML='<option value="">כולם</option>'+contractors().map(x=>`<option>${esc(x)}</option>`).join('');$('#r-con').value=k}
 function repRows(){const f=$('#r-from').value,t=$('#r-to').value,b=$('#r-bld').value,a=$('#r-apt').value,c=$('#r-cat').value,k=$('#r-con').value,s=$('#r-st').value;
-  return S.exps.filter(e=>(!f||e.date>=f)&&(!t||e.date<=t)&&(!b||bldOf(e)===b)&&(!a||e.aptId===a)&&(!c||e.category===c)&&(!k||e.contractor===k)&&(!s||e.status===s)).sort((x,y)=>(x.date||'').localeCompare(y.date||''))}
+  return S.exps.filter(e=>(!f||e.date>=f)&&(!t||e.date<=t)&&(!b||bldOf(e)===b)&&(!a||(a.includes('|')?(e.aptId+'|'+(e.unitId||''))===a:e.aptId===a))&&(!c||e.category===c)&&(!k||e.contractor===k)&&(!s||e.status===s)).sort((x,y)=>(x.date||'').localeCompare(y.date||''))}
 const GRP={category:e=>e.category||'ללא סיווג',apt:e=>aptLabel(e),building:e=>bldOf(e)||'—',contractor:e=>e.contractor||'לא צוין',month:e=>(e.date||'').slice(0,7).split('-').reverse().join('/'),none:()=>''};
 function grouped(rows,g){const m=new Map();rows.forEach(e=>{const k=GRP[g](e);if(!m.has(k))m.set(k,[]);m.get(k).push(e)});return [...m.entries()].sort((x,y)=>g==='month'?0:sum(y[1]).gross-sum(x[1]).gross)}
 function renderRep(){fillRepSelects();const rows=repRows(),g=$('#r-grp').value,t=sum(rows);
@@ -932,7 +956,7 @@ const extOf=t=>({'application/pdf':'pdf','image/jpeg':'jpg','image/png':'png','i
 const xl=v=>v?'="'+String(v).replace(/"/g,'')+'"':'';
 function csvText(header,rows){const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';return '﻿'+[header.map(q).join(','),...rows.map(r=>r.map(q).join(','))].join('\r\n')}
 function folderOf(e){if(e.aptId==='office')return 'משרד';const b=safe(bldOf(e)||'ללא בניין');
-  if(e.aptId&&e.aptId.startsWith('bld:'))return b+'/שטח משותף';const a=S.apts[e.aptId];return b+'/'+safe(a?'דירה '+a.aptNo:String(e.aptLabel||'דירה').split(' · ').pop())}
+  if(e.aptId&&e.aptId.startsWith('bld:'))return b+'/שטח משותף';const a=S.apts[e.aptId];return b+'/'+safe(a?'דירה '+a.aptNo:String(e.aptLabel||'דירה').split(' · ').pop())+(e.unitId?'/'+safe(unitName(e.aptId,e.unitId,e.unitLabel||'יחידה')):'')}
 async function runBackup(btn){
   if(!window.JSZip){toast('רכיב הגיבוי לא נטען. רעננו את הדף.');return}
   if(!S.dl){toast('הורדה אינה זמינה בתצוגה זו');return}
@@ -953,11 +977,11 @@ async function runBackup(btn){
       root.file(K.title+'.csv',csvText(['תאריך','תיאור','נטו','מעמ','סהכ','סטטוס','הערות'],L.map(e=>[fdate(e.date),e.description,e.net,e.vat,e.gross,k==='fuel'?(e.status==='refunded'?'הוחזר':'ממתין להחזר'):'ללא החזר',e.notes])))}
     for(const d of S.adocs){const folder=folderOf(d)+'/מסמכים';for(const r of (d.receipts||[])){btn.textContent='מוריד מסמכים…';const base=safe((DOCT[d.type]||'מסמך')+' '+(d.product||'')+' '+fdate(d.date).replace(/\//g,'-')),ext=extOf(r.type);let name=base+'.'+ext,n=2;while(used.has(folder+'/'+name))name=base+' ('+(n++)+').'+ext;used.add(folder+'/'+name);
       try{root.file(folder+'/'+name,await S.assets.fetchBlob(r.id))}catch(err){missing.push(folder+'/'+name)}}}
-    if(S.adocs.length)root.file('מסמכים ואחריות.csv',csvText(['שייך ל','סוג','מוצר / נושא','ספק','תאריך','בתוקף עד','מצב','הערות'],S.adocs.map(d=>{const st=docStatus(d);return[aptLabel({aptId:d.aptId}),DOCT[d.type]||'',d.product,d.vendor,fdate(d.date),fdate(d.expiry),st?st.txt:'',d.notes]})));
+    if(S.adocs.length)root.file('מסמכים ואחריות.csv',csvText(['שייך ל','סוג','מוצר / נושא','ספק','תאריך','בתוקף עד','מצב','הערות'],S.adocs.map(d=>{const st=docStatus(d);return[aptLabel(d),DOCT[d.type]||'',d.product,d.vendor,fdate(d.date),fdate(d.expiry),st?st.txt:'',d.notes]})));
     root.file('הוצאות.csv',csvText(['תאריך','כתובת / בניין','דירה ודייר','סוג הוצאה','מהות העבודה','בעל מקצוע','מס חשבונית','נטו','מעמ','סהכ','סטטוס','תאריך החזר','הערות','קבצי קבלות'],
       exps.map(e=>[fdate(e.date),bldOf(e),aptShort(e),e.category,e.description,e.contractor,e.invoiceNo,e.net,e.vat,e.gross,e.status==='refunded'?'הוחזר':'ממתין להחזר',fdate(e.refundedAt),e.notes,(paths.get(e.id)||[]).join(' | ')])));
-    root.file('דירות.csv',csvText(['בניין','דירה','קומה','דייר','טלפון','טלפון נוסף','מונה מים','מונה חשמל','חוזה חשמל','מונה גז','הערות'],
-      aptsSorted().map(([,a])=>[a.building,a.aptNo,a.floor,a.tenantName,xl(a.phone),xl(a.phone2),xl(a.waterMeter),xl(a.elecMeter),xl(a.elecContract),xl(a.gasMeter),a.notes])));
+    root.file('דירות.csv',csvText(['בניין','דירה','יחידה','קומה','דייר','טלפון','טלפון נוסף','מונה מים','מונה חשמל','חוזה חשמל','מונה גז','מונה מים משני','מונה חשמל משני','הערות'],
+      aptsSorted().flatMap(([,a])=>[[a.building,a.aptNo,unitsOf(a).length?'כל הדירה':'',a.floor,a.tenantName,xl(a.phone),xl(a.phone2),xl(a.waterMeter),xl(a.elecMeter),xl(a.elecContract),xl(a.gasMeter),'','',a.notes]].concat(unitsOf(a).map(u=>[a.building,a.aptNo,u.name,a.floor,u.tenantName,xl(u.phone),xl(u.phone2),'','','','',xl(u.waterSub),xl(u.elecSub),u.notes])))));
     if(missing.length)root.file('קבלות שלא ירדו.txt',missing.join('\r\n'));
     btn.textContent='אורז קובץ…';
     const blob=await zip.generateAsync({type:'blob'});
@@ -1045,7 +1069,7 @@ const DOCT={warranty:'תעודת אחריות',receipt:'קבלה / חשבוני�
 function addMonths(d,m){if(!d||!(+m))return '';const [y,mo,da]=d.split('-').map(Number);const x=new Date(y,mo-1+(+m),da);if(x.getDate()!==da)x.setDate(0);return x.getFullYear()+'-'+pad(x.getMonth()+1)+'-'+pad(x.getDate())}
 function docStatus(d){if(!d||!d.expiry)return null;const days=Math.ceil((new Date(d.expiry+'T23:59:59')-Date.now())/864e5);
   if(days<0)return{cls:'exp',txt:'פג תוקף',days};if(days<=30)return{cls:'soon',txt:'פג בעוד '+days+' ימים',days};return{cls:'ok',txt:'בתוקף עד '+fdate(d.expiry),days}}
-function docsOf(aptId){return S.adocs.filter(d=>d.aptId===aptId)}
+function docsOf(scope){const [a,u]=splitScope(scope);return S.adocs.filter(d=>d.aptId===a&&(!u||d.unitId===u))}
 function docAlert(list){let e=0,s=0;list.forEach(d=>{const st=docStatus(d);if(st&&st.cls==='soon')s++;if(st&&st.cls==='exp')e++});return{e,s}}
 function docChip(st){return st?`<span class="chip ${st.cls==='exp'?'bad':st.cls==='soon'?'pend':'done'}">${st.txt}</span>`:''}
 function openDocs(scope,filter){S.sheetView={k:'docs',scope,filter:filter||''};renderDocs(false)}
@@ -1053,10 +1077,10 @@ function renderDocs(keep){const v=S.sheetView;if(!v||v.k!=='docs')return;const a
   let list=all?S.adocs.slice():docsOf(v.scope);
   if(f==='warranty')list=list.filter(d=>d.expiry);else if(f){list=list.filter(d=>{const s=docStatus(d);return s&&s.cls===f})}
   list.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-  openSheet(`<h2>📁 ${esc(all?'כל המסמכים והאחריות':'מסמכים · '+aptLabel({aptId:v.scope}))}</h2>
+  openSheet(`<h2>📁 ${esc(all?'כל המסמכים והאחריות':'מסמכים · '+aptLabel({aptId:splitScope(v.scope)[0],unitId:splitScope(v.scope)[1]}))}</h2>
    <div class="scan-modes">${[['','הכל'],['warranty','עם אחריות'],['soon','עומדים לפוג'],['exp','פג תוקף']].map(([k,l])=>`<button type="button" class="chipbtn" data-df="${k}" aria-pressed="${f===k}">${l}</button>`).join('')}</div>
    ${S.canWrite?`<div class="row"><button type="button" class="btn primary" id="d-add">+ מסמך חדש</button></div>`:''}
-   <div class="list">${list.length?list.map(d=>`<div class="exp" data-did="${esc(d.id)}" tabindex="0"><div class="t">${esc(d.product||DOCT[d.type]||'מסמך')}</div><div class="a">${docChip(docStatus(d))}</div><div class="m">${esc(DOCT[d.type]||'')}${d.date?' · '+esc(fdate(d.date)):''}${d.vendor?' · '+esc(d.vendor):''}${all?' · '+esc(aptLabel({aptId:d.aptId})):''}</div><div class="v"></div><div class="chips">${(d.receipts||[]).length?`<span class="chip">📎 ${d.receipts.length} קבצים</span>`:''}${d.expiry&&docStatus(d).cls!=='ok'?`<span class="chip">עד ${esc(fdate(d.expiry))}</span>`:''}</div></div>`).join(''):`<div class="empty"><b>אין מסמכים${f?' בסינון הזה':''}</b>${S.canWrite?'לחצו על "+ מסמך חדש" כדי לשמור קבלה, תעודת אחריות, חוזה או כל מסמך אחר.':''}</div>`}</div>`,keep);
+   <div class="list">${list.length?list.map(d=>`<div class="exp" data-did="${esc(d.id)}" tabindex="0"><div class="t">${esc(d.product||DOCT[d.type]||'מסמך')}</div><div class="a">${docChip(docStatus(d))}</div><div class="m">${esc(DOCT[d.type]||'')}${d.date?' · '+esc(fdate(d.date)):''}${d.vendor?' · '+esc(d.vendor):''}${all?' · '+esc(aptLabel(d)):(d.unitId&&!splitScope(v.scope)[1]?' · '+esc(unitName(d.aptId,d.unitId,'יחידה')):'')}</div><div class="v"></div><div class="chips">${(d.receipts||[]).length?`<span class="chip">📎 ${d.receipts.length} קבצים</span>`:''}${d.expiry&&docStatus(d).cls!=='ok'?`<span class="chip">עד ${esc(fdate(d.expiry))}</span>`:''}</div></div>`).join(''):`<div class="empty"><b>אין מסמכים${f?' בסינון הזה':''}</b>${S.canWrite?'לחצו על "+ מסמך חדש" כדי לשמור קבלה, תעודת אחריות, חוזה או כל מסמך אחר.':''}</div>`}</div>`,keep);
   S.sheetView=v;
   $$('#sheet-card [data-df]').forEach(b=>b.addEventListener('click',()=>{S.sheetView.filter=b.dataset.df;renderDocs(true)}));
   const add=$('#d-add');if(add)add.addEventListener('click',()=>openDoc(null,v.scope));
@@ -1064,10 +1088,11 @@ function renderDocs(keep){const v=S.sheetView;if(!v||v.k!=='docs')return;const a
 function openDoc(id,scope){const d=id?S.adocs.find(x=>x.id===id):null;if(id&&!d)return;const ro=!S.canWrite;
   const back=S.sheetView&&S.sheetView.k==='docs'?Object.assign({},S.sheetView):{k:'docs',scope:scope||(d?d.aptId:'*'),filter:''};
   S.sheetView=null;draftReceipts=d?(d.receipts||[]).slice():[];freshUploads=[];
-  const aid=d?d.aptId:(scope&&scope!=='*'?scope:'');
+  const sc=splitScope(scope&&scope!=='*'?scope:''),aid=d?d.aptId:sc[0],uid=d?d.unitId||'':sc[1];
   const wmOpts=[6,12,24,36,60,84,120].map(m=>`<option value="${m}">${m%12?m+' חודשים':m===12?'שנה':m===24?'שנתיים':(m/12)+' שנים'}</option>`).join('');
   openSheet(`<h2>${d?'עריכת מסמך':'מסמך חדש'}</h2><form id="df" class="list" novalidate>
    <label class="fld">שייך ל<select id="d-apt">${aptOptions(aid)}</select></label>
+   <label class="fld" id="w-dunit" hidden>יחידה בדירה המחולקת<select id="d-unit"></select></label>
    <div class="two"><label class="fld">סוג מסמך<select id="d-type">${Object.entries(DOCT).map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}</select></label>
     <label class="fld">תאריך (רכישה / מסמך)<input type="date" id="f-date" value="${esc(d?d.date||'':today())}"></label></div>
    <label class="fld">מוצר / נושא<input id="d-product" value="${esc(d?d.product||'':'')}" placeholder="לדוגמה: מזגן בסלון, דוד שמש, חוזה שכירות"></label>
@@ -1081,6 +1106,7 @@ function openDoc(id,scope){const d=id?S.adocs.find(x=>x.id===id):null;if(id&&!d)
    <div class="notice warn" id="f-err" hidden></div>
    <div class="foot">${d&&!ro?'<button type="button" class="btn danger" id="d-del">מחיקה</button>':'<span></span>'}<div class="row"><button type="button" class="btn" id="d-back">חזרה לרשימה</button>${ro?'':'<button type="submit" class="btn primary" id="f-save">שמירה</button>'}</div></div>
   </form>`);
+  bindUnitSel($('#d-apt'),$('#w-dunit'),$('#d-unit'),uid);
   $('#d-type').value=d?d.type||'other':'warranty';
   $('#d-wm').value=d?(d.warrantyMonths?String(d.warrantyMonths):(d.expiry?'custom':'0')):'0';
   if(ro)$$('#df input,#df select,#df textarea').forEach(i=>i.disabled=true);
@@ -1096,18 +1122,18 @@ function openDoc(id,scope){const d=id?S.adocs.find(x=>x.id===id):null;if(id&&!d)
     try{await S.db.doc('adocs/'+d.id).delete();for(const r of (d.receipts||[]))for(const x of [r.id,r.preview].filter(Boolean)){if(!assetFree(x,d))continue;try{await S.assets.delete(x)}catch(_){}}toast('המסמך נמחק');S.sheetView=back;renderDocs(false)}catch(err){showErr('המחיקה נכשלה.')}});
   $('#df').addEventListener('submit',async ev=>{ev.preventDefault();const aptId=$('#d-apt').value;if(!aptId)return showErr('נא לבחור לאיזו דירה המסמך שייך.');
     const wm=$('#d-wm').value;
-    const doc={aptId,type:$('#d-type').value,date:$('#f-date').value,product:$('#d-product').value.trim(),vendor:$('#d-vendor').value.trim(),warrantyMonths:+wm||0,expiry:$('#d-exp').value,notes:$('#d-notes').value.trim(),receipts:draftReceipts,
+    const doc={aptId,unitId:$('#w-dunit').hidden?'':$('#d-unit').value,type:$('#d-type').value,date:$('#f-date').value,product:$('#d-product').value.trim(),vendor:$('#d-vendor').value.trim(),warrantyMonths:+wm||0,expiry:$('#d-exp').value,notes:$('#d-notes').value.trim(),receipts:draftReceipts,
       createdAt:d?d.createdAt||Date.now():Date.now(),createdBy:d?(d.createdBy||''):(S.uid||''),updatedAt:Date.now(),updatedBy:S.uid||''};
     if(!doc.product&&!draftReceipts.length)return showErr('נא לכתוב מוצר / נושא או לצרף קובץ.');
     const btn=$('#f-save');btn.disabled=true;
     try{await (d?S.db.doc('adocs/'+d.id):S.db.collection('adocs').doc()).set(doc);
       if(d&&S.assets)(d.receipts||[]).filter(r=>!draftReceipts.some(x=>x.id===r.id)).forEach(r=>[r.id,r.preview].filter(Boolean).filter(x=>assetFree(x,d)).forEach(x=>S.assets.delete(x).catch(()=>{})));
-      freshUploads=[];toast('המסמך נשמר');S.sheetView=back.scope==='*'?back:{k:'docs',scope:aptId,filter:''};renderDocs(false)}
+      freshUploads=[];toast('המסמך נשמר');S.sheetView=back.scope==='*'||splitScope(back.scope)[0]===aptId?back:{k:'docs',scope:aptId,filter:''};renderDocs(false)}
     catch(err){btn.disabled=false;showErr('השמירה נכשלה. נסו שוב.')}})}
 $('#a-docs').addEventListener('click',()=>openDocs('*'));
 
 /* ---------- Excel import of apartments ---------- */
-const IMPF=[['building','בניין / כתובת',['כתובת הבניין','שם הבניין','בניין','כתובת','רחוב','building','address']],['aptNo','מספר דירה',['מספר דירה','מס דירה','דירה מס','דירה','apt','apartment','unit']],['floor','קומה',['קומה','floor']],['tenantName','שם הדייר',['שם הדייר','שם דייר','שם השוכר','שם שוכר','דייר','שוכר','שם','tenant','name']],['phone','טלפון',['טלפון נייד','טלפון','נייד','פלאפון','סלולרי','phone','mobile','tel']],['phone2','טלפון נוסף',['טלפון נוסף','טלפון 2','נייד 2','phone 2','phone2']],['waterMeter','מונה מים',['מונה מים','מס מונה מים','מספר מונה מים','מים','water']],['elecMeter','מונה חשמל',['מונה חשמל','מס מונה חשמל','מספר מונה חשמל','חשמל','electric','electricity']],['elecContract','חוזה חשמל',['חוזה חשמל','מספר חוזה','חוזה','contract']],['gasMeter','מונה גז',['מונה גז','מספר מונה גז','גז','gas']],['notes','הערות',['הערות','הערה','notes','remarks']]];
+const IMPF=[['building','בניין / כתובת',['כתובת הבניין','שם הבניין','בניין','כתובת','רחוב','building','address']],['aptNo','מספר דירה',['מספר דירה','מס דירה','דירה מס','דירה','apt','apartment','unit']],['floor','קומה',['קומה','floor']],['tenantName','שם הדייר',['שם הדייר','שם דייר','שם השוכר','שם שוכר','דייר','שוכר','שם','tenant','name']],['phone','טלפון',['טלפון נייד','טלפון','נייד','פלאפון','סלולרי','phone','mobile','tel']],['phone2','טלפון נוסף',['טלפון נוסף','טלפון 2','נייד 2','phone 2','phone2']],['waterMeter','מונה מים',['מונה מים','מס מונה מים','מספר מונה מים','מים','water']],['elecMeter','מונה חשמל',['מונה חשמל','מס מונה חשמל','מספר מונה חשמל','חשמל','electric','electricity']],['elecContract','חוזה חשמל',['חוזה חשמל','מספר חוזה','חוזה','contract']],['gasMeter','מונה גז',['מונה גז','מספר מונה גז','גז','gas']],['unit','יחידה (בדירה מחולקת)',['מספר יחידה','יחידה','תת דירה','חלק','unit']],['waterSub','מונה מים משני',['מונה מים משני','מונה משני מים','מונה משנה מים','מים משני']],['elecSub','מונה חשמל משני',['מונה חשמל משני','מונה משני חשמל','מונה משנה חשמל','חשמל משני']],['notes','הערות',['הערות','הערה','notes','remarks']]];
 function normH(s){return String(s??'').toLowerCase().replace(/["'״׳.\-_:()#\/]/g,' ').replace(/\s+/g,' ').trim()}
 function guessMap(headers){const H=(headers||[]).map(normH),used=new Set(),map={},cand=[];
   IMPF.forEach(([k,,kw])=>H.forEach((h,ci)=>{if(!h)return;kw.forEach(w=>{const n=normH(w);const sc=h===n?100+n.length:(h.split(' ').includes(n)||h.includes(n))?n.length:0;if(sc)cand.push({k,ci,sc})})}));
@@ -1129,8 +1155,15 @@ function fixPhone(s){s=String(s||'').trim();if(/^\d{8,9}$/.test(s)&&s[0]!=='0')s
 function impBuild(){const I=S.imp,m=I.map,out=[];(I.rows||[]).slice(I.hr+1).forEach(r=>{if(!r.some(Boolean))return;const a={};IMPF.forEach(([k])=>a[k]=m[k]===undefined?'':String(r[m[k]]??'').trim());
   if(m.building===undefined)a.building=(I.bld||'').trim();a.phone=fixPhone(a.phone);a.phone2=fixPhone(a.phone2);a.aptNo=a.aptNo.replace(/^דירה\s*/,'').trim();if(a.aptNo)out.push(a)});return out}
 const aptKey=(b,n)=>normH(b)+'|'+normH(n);
-function impPlan(list){const ex={};Object.entries(S.apts).forEach(([id,a])=>ex[aptKey(a.building,a.aptNo)]=id);let add=0,upd=0;const seen=new Set();
-  list.forEach(a=>{const k=aptKey(a.building,a.aptNo);if(ex[k]||seen.has(k))upd++;else add++;seen.add(k)});return{add,upd,ex}}
+function impGroup(list){const g=new Map();list.forEach(a=>{const k=aptKey(a.building,a.aptNo);if(!g.has(k))g.set(k,[]);g.get(k).push(a)});
+  return [...g.entries()].map(([key,R])=>{const common=f=>{const v=[...new Set(R.map(r=>r[f]).filter(Boolean))];return v.length===1?v[0]:''},first=f=>(R.find(r=>r[f])||{})[f]||'';
+    const base={building:first('building'),aptNo:first('aptNo'),floor:common('floor')||first('floor'),elecContract:common('elecContract')||first('elecContract'),gasMeter:common('gasMeter')||first('gasMeter')};
+    if(R.length===1&&!R[0].unit){const r=R[0];Object.assign(base,{tenantName:r.tenantName,phone:r.phone,phone2:r.phone2,waterMeter:r.waterMeter,elecMeter:r.elecMeter,notes:r.notes});return{key,apt:base,units:null}}
+    const wm=common('waterMeter'),em=common('elecMeter');Object.assign(base,{waterMeter:wm,elecMeter:em});
+    const units=R.map((r,i)=>({name:r.unit?(/^\d+$/.test(r.unit)?'יחידה '+r.unit:r.unit):'יחידה '+(i+1),tenantName:r.tenantName,phone:r.phone,phone2:r.phone2,waterSub:r.waterSub||(wm?'':r.waterMeter),elecSub:r.elecSub||(em?'':r.elecMeter),notes:r.notes}));
+    return{key,apt:base,units}})}
+function impPlan(list){const ex={};Object.entries(S.apts).forEach(([id,a])=>ex[aptKey(a.building,a.aptNo)]=id);const G=impGroup(list);let add=0,upd=0,div=0;
+  G.forEach(g=>{if(ex[g.key])upd++;else add++;if(g.units)div++});return{add,upd,div,ex,n:G.length}}
 function renderImport(keep){const I=S.imp,head=I.rows[I.hr]||[],list=impBuild(),plan=impPlan(list),noB=list.filter(a=>!a.building).length;
   const colOpt=sel=>`<option value="">— לא לייבא —</option>`+head.map((h,i)=>`<option value="${i}" ${sel===i?'selected':''}>${esc(h||('טור '+(i+1)))}</option>`).join('');
   openSheet(`<h2>📥 ייבוא מ-${esc(I.name)}</h2>
@@ -1140,11 +1173,11 @@ function renderImport(keep){const I=S.imp,head=I.rows[I.hr]||[],list=impBuild(),
    <div class="grid-f">${IMPF.map(([k,l])=>`<label class="fld">${l}<select data-mk="${k}">${colOpt(I.map[k])}</select></label>`).join('')}</div>
    ${I.map.building===undefined?`<label class="fld">אין טור בניין בקובץ. לאיזה בניין לשייך את כל הדירות?<input id="i-bld" list="i-bl" value="${esc(I.bld)}" placeholder="שם או כתובת הבניין"><datalist id="i-bl">${buildings().map(b=>`<option value="${esc(b)}">`).join('')}</datalist></label>`:''}
    <div class="fld" style="color:var(--muted);font-weight:600;font-size:.85rem">תצוגה מקדימה</div>
-   <div class="tbl-wrap"><table><thead><tr><th>בניין</th><th>דירה</th><th>קומה</th><th>דייר</th><th>טלפון</th><th>מונה מים</th><th>מונה חשמל</th></tr></thead><tbody>${list.slice(0,6).map(a=>`<tr><td>${esc(a.building)||'<span style="color:var(--danger)">חסר</span>'}</td><td>${esc(a.aptNo)}</td><td>${esc(a.floor)}</td><td>${esc(a.tenantName)}</td><td class="num">${esc(a.phone)}</td><td class="num">${esc(a.waterMeter)}</td><td class="num">${esc(a.elecMeter)}</td></tr>`).join('')||'<tr><td colspan="7" style="white-space:normal">לא נמצאו שורות עם מספר דירה. בדקו שהטור "מספר דירה" נבחר.</td></tr>'}</tbody></table></div>
-   <div class="calc">${list.length} דירות בקובץ: ${plan.add} חדשות, ${plan.upd} יעדכנו דירות קיימות${noB?` · <b style="color:var(--danger)">${noB} בלי בניין</b>`:''}</div>
+   <div class="tbl-wrap"><table><thead><tr><th>בניין</th><th>דירה</th><th>קומה</th><th>יחידה</th><th>דייר</th><th>טלפון</th><th>מונה מים</th><th>מונה חשמל</th></tr></thead><tbody>${list.slice(0,6).map(a=>`<tr><td>${esc(a.building)||'<span style="color:var(--danger)">חסר</span>'}</td><td>${esc(a.aptNo)}</td><td>${esc(a.unit)}</td><td>${esc(a.floor)}</td><td>${esc(a.tenantName)}</td><td class="num">${esc(a.phone)}</td><td class="num">${esc(a.waterMeter)}</td><td class="num">${esc(a.elecMeter)}</td></tr>`).join('')||'<tr><td colspan="8" style="white-space:normal">לא נמצאו שורות עם מספר דירה. בדקו שהטור "מספר דירה" נבחר.</td></tr>'}</tbody></table></div>
+   <div class="calc">${list.length} שורות = ${plan.n} דירות${plan.div?` (מתוכן ${plan.div} מחולקות)`:''}: ${plan.add} חדשות, ${plan.upd} יעדכנו דירות קיימות${noB?` · <b style="color:var(--danger)">${noB} בלי בניין</b>`:''}</div>
    <label class="scan-pdf"><input type="checkbox" id="i-over" ${I.over?'checked':''}> לעדכן גם משבצות שכבר מלאות בדירות קיימות</label>
    <div class="notice warn" id="f-err" hidden></div>
-   <div class="foot"><button type="button" class="btn" id="i-back">קובץ אחר</button><button type="button" class="btn primary" id="i-go" ${list.length&&!noB?'':'disabled'}>ייבוא ${list.length} דירות</button></div>`,keep);
+   <div class="foot"><button type="button" class="btn" id="i-back">קובץ אחר</button><button type="button" class="btn primary" id="i-go" ${list.length&&!noB?'':'disabled'}>ייבוא ${plan.n} דירות</button></div>`,keep);
   const sh=$('#i-sheet');if(sh)sh.addEventListener('change',()=>{I.sheet=sh.value;impSheet()});
   $('#i-hr').addEventListener('change',ev=>{I.hr=+ev.target.value;I.map=guessMap(I.rows[I.hr]);renderImport(true)});
   $$('#sheet-card [data-mk]').forEach(s=>s.addEventListener('change',()=>{const k=s.dataset.mk,v=s.value===''?undefined:+s.value;if(v!==undefined)Object.keys(I.map).forEach(o=>{if(I.map[o]===v)delete I.map[o]});if(v===undefined)delete I.map[k];else I.map[k]=v;renderImport(true)}));
@@ -1152,10 +1185,14 @@ function renderImport(keep){const I=S.imp,head=I.rows[I.hr]||[],list=impBuild(),
   $('#i-over').addEventListener('change',ev=>{I.over=ev.target.checked});
   $('#i-back').addEventListener('click',openImport);
   $('#i-go').addEventListener('click',impRun)}
-async function impRun(){const I=S.imp,list=impBuild();if(!list.length)return;const {ex}=impPlan(list),btn=$('#i-go');btn.disabled=true;let add=0,upd=0,fail=0,i=0;const made={};
-  for(const a of list){i++;btn.textContent=`מייבא ${i}/${list.length}…`;const k=aptKey(a.building,a.aptNo),id=ex[k];
-    try{if(id){const cur=Object.assign({},S.apts[id]||{},made[id]||{});IMPF.forEach(([f])=>{if(a[f]&&(I.over||!cur[f]))cur[f]=a[f]});cur.updatedAt=Date.now();await S.db.doc('apartments/'+id).set(cur);made[id]=cur;upd++}
-      else{const ref=S.db.collection('apartments').doc(),n={updatedAt:Date.now()};IMPF.forEach(([f])=>n[f]=a[f]||'');await ref.set(n);ex[k]=ref.id;made[ref.id]=n;add++}}catch(e){fail++}}
+async function impRun(){const I=S.imp,list=impBuild();if(!list.length)return;const groups=impGroup(list),{ex}=impPlan(list),btn=$('#i-go');btn.disabled=true;let add=0,upd=0,fail=0,i=0;
+  const UFS=['tenantName','phone','phone2','waterSub','elecSub','notes'],AF=['building','aptNo','floor','tenantName','phone','phone2','waterMeter','elecMeter','elecContract','gasMeter','notes'];
+  for(const G of groups){i++;btn.textContent=`מייבא ${i}/${groups.length}…`;const id=ex[G.key];
+    try{if(id){const cur=JSON.parse(JSON.stringify(S.apts[id]||{}));AF.forEach(f=>{const v=G.apt[f];if(v&&(I.over||!cur[f]))cur[f]=v});
+        if(G.units){const us=unitsOf(cur).slice();G.units.forEach(nu=>{let u=us.find(x=>normH(x.name)===normH(nu.name));if(!u){let k=us.length+1,uid;do{uid='u'+(k++)}while(us.some(x=>x.id===uid));u={id:uid,name:nu.name};us.push(u)}UFS.forEach(f=>{if(nu[f]&&(I.over||!u[f]))u[f]=nu[f]})});cur.divided=true;cur.units=us;cur.tenantName='';cur.phone='';cur.phone2=''}
+        cur.updatedAt=Date.now();await S.db.doc('apartments/'+id).set(cur);upd++}
+      else{const n={updatedAt:Date.now()};AF.forEach(f=>n[f]=G.apt[f]||'');if(G.units){n.divided=true;n.units=G.units.map((u,j)=>Object.assign({id:'u'+(j+1),name:u.name},Object.fromEntries(UFS.map(f=>[f,u[f]||'']))))}
+        const ref=S.db.collection('apartments').doc();await ref.set(n);ex[G.key]=ref.id;add++}}catch(e){fail++}}
   closeSheet();S.imp=null;toast(`הייבוא הסתיים: ${add} דירות חדשות, ${upd} עודכנו${fail?', '+fail+' נכשלו':''}`);showTab('apt')}
 $('#a-import').addEventListener('click',openImport);
 
