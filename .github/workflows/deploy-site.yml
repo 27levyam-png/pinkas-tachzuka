@@ -23,7 +23,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: מספר גרסה
-        run: echo "window.APP_VERSION='$(tr -d ' \r\n' < VERSION).${{ github.run_number }} (אתר)';" > www/version.js
+        run: |
+          N=$(( ${{ github.run_number }} - 1 ))
+          echo "window.APP_VERSION='$(( 1 + N / 100 )).$(( (N / 10) % 10 )).$(( N % 10 )) (אתר)';" > www/version.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
