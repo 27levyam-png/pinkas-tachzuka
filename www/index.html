@@ -317,6 +317,10 @@ a.btn{text-decoration:none}
       <div><button class="btn primary" id="s-save" data-w>שמירת הגדרות</button></div>
     </div>
     <div class="panel">
+      <div><b style="font-size:1.05rem">🔍 זיהוי אוטומטי של קבלות</b><div style="color:var(--muted);font-size:.92rem">אחרי סריקה או צירוף תמונה, האפליקציה קוראת את הקבלה וממלאת לבד תאריך, סכום, ספק ואחריות. הזיהוי נעשה בתוך המכשיר עצמו, והסריקות לא נשלחות לשום מקום.</div></div>
+      <label class="scan-pdf"><input type="checkbox" id="ocr-auto"> לזהות אוטומטית אחרי כל סריקה</label>
+    </div>
+    <div class="panel">
       <div><b style="font-size:1.05rem">גיבוי מלא</b><div style="color:var(--muted);font-size:.92rem">מוריד קובץ ZIP עם אקסל של כל ההוצאות והדירות, וכל הקבלות מסודרות בתיקיות לפי בניין ודירה, בשם סוג ההוצאה והתאריך. מומלץ פעם בחודש.</div></div>
       <div class="row"><button class="btn primary" id="b-run">הורדת גיבוי מלא</button><span id="b-last" style="color:var(--muted);font-size:.9rem"></span></div>
     </div>
@@ -431,7 +435,7 @@ function aptOptions(sel){let h='<option value="">— בחרו דירה —</opti
   if(sel&&sel!=='office'&&!sel.startsWith('bld:')&&!S.apts[sel])h+=`<option value="${esc(sel)}" selected>(דירה שנמחקה)</option>`;return h}
 function openExpense(id){
   const e=id?S.exps.find(x=>x.id===id):null;if(id&&!e)return;
-  const ro=!S.canWrite;draftReceipts=e?(e.receipts||[]).slice():[];freshUploads=[];
+  const ro=!S.canWrite;draftReceipts=e?(e.receipts||[]).slice():[];freshUploads=[];const war=e?S.adocs.find(x=>x.id==='exp-'+e.id):null;
   const cats=[...new Set([...S.settings.categories.filter(c=>c!=='תיקונים קטנים'),'תיקונים קלים','הוצאות משרד'])];if(e&&e.category&&!cats.includes(e.category))cats.push(e.category);
   openSheet(`<h2>${e?'עריכת הוצאה':'הוצאה חדשה'}</h2>
   <form id="ef" class="list" novalidate>
@@ -445,15 +449,19 @@ function openExpense(id){
    <div class="calc" id="f-calc"></div>
    <div class="two"><label class="fld">מס' חשבונית / קבלה<input id="f-inv" value="${esc(e?e.invoiceNo:'')}"></label>
     <label class="fld">סטטוס החזר<select id="f-st"><option value="pending">ממתין להחזר</option><option value="refunded" ${e&&e.status==='refunded'?'selected':''}>הוחזר</option></select></label></div>
-   <label class="fld">הערות<textarea id="f-notes">${esc(e?e.notes:'')}</textarea></label>
+      <label class="scan-pdf"><input type="checkbox" id="f-war" ${war?'checked':''}> הקבלה הזו היא גם תעודת אחריות</label>
+   <div class="two" id="f-war-box" ${war?'':'hidden'}><label class="fld">המוצר שבאחריות<input id="f-wprod" value="${esc(war?war.product||'':'')}" placeholder="לדוגמה: דוד חשמל 120 ליטר"></label>
+    <label class="fld">תקופת אחריות<select id="f-wm">${WMS.map(m=>`<option value="${m}" ${(war?war.warrantyMonths:12)===m?'selected':''}>${wmLabel(m)}</option>`).join('')}</select></label></div>
+<label class="fld">הערות<textarea id="f-notes">${esc(e?e.notes:'')}</textarea></label>
    <div class="fld">קבלות</div>
-   <div class="receipts" id="f-rc"></div>
+   <div class="receipts" id="f-rc"></div><div class="notice" id="ai-st" hidden></div>${ocrAvailable()&&!ro?'<button type="button" class="btn sm" id="ai-btn" style="justify-self:start">🔍 זיהוי פרטים מהקבלה</button>':''}
    ${S.assets&&!ro?`<div class="row"><span class="btn filebtn">📷 סריקת קבלה<input type="file" id="f-scan" accept="image/*" capture="environment" aria-label="סריקת קבלה"></span><span class="btn filebtn">📎 צירוף קובץ<input type="file" id="f-file" accept="image/*,application/pdf" multiple aria-label="צירוף קבלה"></span><button type="button" class="btn" id="f-internal">🧾 קבלה פנימית</button></div>`:`<div class="notice" style="margin:0">${ro?'צפייה בלבד.':'צירוף קבלות זמין למי שהוזמן לדף בהרשאת עריכה.'}</div>`}
    <div class="foot">${e&&!ro?'<button type="button" class="btn danger" id="f-del">מחיקה</button>':'<span></span>'}
     <div class="row"><button type="button" class="btn" id="f-cancel">${ro?'סגירה':'ביטול'}</button>${ro?'':'<button type="submit" class="btn primary" id="f-save">שמירה</button>'}</div></div>
    <div class="notice" id="f-err" hidden></div>
    ${e&&(e.createdBy||e.updatedBy)?`<div style="color:var(--muted);font-size:.82rem">${nameOf(e.createdBy)?'נרשם ע"י '+esc(nameOf(e.createdBy)):''}${e.updatedBy&&e.updatedBy!==e.createdBy&&nameOf(e.updatedBy)?' · עודכן ע"י '+esc(nameOf(e.updatedBy)):''}</div>`:''}
   </form>`);
+  $('#f-war').addEventListener('change',()=>{$('#f-war-box').hidden=!$('#f-war').checked;if($('#f-war').checked&&!$('#f-wprod').value)$('#f-wprod').value=$('#f-desc').value});
   if(e)$('#f-vm').value=e.vatMode||'incl';
   if(ro)$$('#ef input,#ef select,#ef textarea').forEach(i=>i.disabled=true);
   const upd=()=>{const c=calcVat($('#f-amount').value,$('#f-vm').value,S.settings.vatRate);$('#f-calc').innerHTML=`נטו: <b class="num">${money(c.net)}</b> מע"מ (${S.settings.vatRate}%): <b class="num">${money(c.vat)}</b> סה"כ: <b class="num">${money(c.gross)}</b>`};
@@ -468,7 +476,7 @@ function openExpense(id){
   const fsn=$('#f-scan');if(fsn)fsn.addEventListener('change',()=>{const f=fsn.files[0];fsn.value='';if(f)scanOpen(f)});
   const fi=$('#f-file');if(fi)fi.addEventListener('change',()=>uploadFiles([...fi.files]).then(()=>fi.value=''));
   $('#f-cancel').addEventListener('click',cancelExpense);
-  if($('#f-del'))armConfirm($('#f-del'),'למחוק? לחצו שוב',async()=>{try{await S.db.doc('expenses/'+e.id).delete();for(const r of (e.receipts||[])){for(const id of [r.id,r.preview].filter(Boolean)){try{await S.assets&&S.assets.delete(id)}catch(x){}}}closeSheet();toast('ההוצאה נמחקה')}catch(err){showErr('המחיקה נכשלה. נסו שוב.')}});
+  if($('#f-del'))armConfirm($('#f-del'),'למחוק? לחצו שוב',async()=>{try{await S.db.doc('expenses/'+e.id).delete();for(const r of (e.receipts||[])){for(const id of [r.id,r.preview].filter(Boolean)){if(!assetFree(id,e))continue;try{await S.assets&&S.assets.delete(id)}catch(x){}}}closeSheet();toast('ההוצאה נמחקה')}catch(err){showErr('המחיקה נכשלה. נסו שוב.')}});
   $('#ef').addEventListener('submit',ev=>{ev.preventDefault();saveExpense(e)});
 }
 function showErr(m){const x=$('#f-err');if(x){x.hidden=false;x.className='notice warn';x.textContent=m}}
@@ -485,9 +493,9 @@ async function shrink(file){if(!file.type.startsWith('image/')||file.size<2.5e6)
   try{const bmp=await createImageBitmap(file);const sc=Math.min(1,2400/Math.max(bmp.width,bmp.height));const c=document.createElement('canvas');c.width=Math.round(bmp.width*sc);c.height=Math.round(bmp.height*sc);c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
     return await new Promise(res=>c.toBlob(b=>res(b||file),'image/jpeg',.88))}catch(e){return file}}
 async function uploadFiles(files){const btn=$('#f-save');if(btn)btn.disabled=true;
-  for(const f of files){try{toast('מעלה קבלה…');const blob=await shrink(f);const type=blob.type||f.type||'image/jpeg';const r=await S.assets.upload(blob,{type});draftReceipts.push({id:r.id,type:r.contentType,name:f.name});freshUploads.push(r.id)}
+  for(const f of files){try{toast('מעלה קבלה…');const blob=await shrink(f);const type=blob.type||f.type||'image/jpeg';const r=await S.assets.upload(blob,{type});draftReceipts.push({id:r.id,type:r.contentType,name:f.name});freshUploads.push(r.id);S.ocrLast=[blob,type]}
     catch(err){showErr(err&&err.code==='too_large'?'הקובץ גדול מדי (עד 20MB).':err&&err.code==='unsupported_type'?'סוג קובץ לא נתמך. אפשר תמונה או PDF.':'העלאת הקבלה נכשלה. נסו שוב.')}}
-  if(btn)btn.disabled=false;renderReceipts(false)}
+  if(btn)btn.disabled=false;renderReceipts(false);if(S.ocrLast&&ocrAuto()){const l=S.ocrLast;S.ocrLast=null;ocrRun(l[0],l[1])}}
 function cancelExpense(){if(S.assets)freshUploads.forEach(id=>S.assets.delete(id).catch(()=>{}));freshUploads=[];closeSheet()}
 async function openReceipt(r){if(!r)return;const lb=$('#lightbox'),isPdf=r.type==='application/pdf',vid=isPdf?r.preview:r.id;
   if(isPdf&&!vid)return openOriginal(r);
@@ -528,7 +536,11 @@ async function saveExpense(old){
     createdAt:old?old.createdAt||Date.now():Date.now(),createdBy:old?(old.createdBy||''):(S.uid||''),updatedAt:Date.now(),updatedBy:S.uid||''};
   const btn=$('#f-save');btn.disabled=true;
   try{const ref=old?S.db.doc('expenses/'+old.id):S.db.collection('expenses').doc();await ref.set(doc);
-    if(old&&S.assets){(old.receipts||[]).filter(r=>!draftReceipts.some(d=>d.id===r.id)).forEach(r=>[r.id,r.preview].filter(Boolean).forEach(id=>S.assets.delete(id).catch(()=>{})))}
+    const wid='exp-'+ref.id,hadW=S.adocs.some(x=>x.id===wid);
+    if($('#f-war').checked){const wm=+$('#f-wm').value||12,oldW=S.adocs.find(x=>x.id===wid);
+      try{await S.db.doc('adocs/'+wid).set({aptId,type:'warranty',date,product:$('#f-wprod').value.trim()||doc.description||doc.category,vendor:doc.contractor,warrantyMonths:wm,expiry:addMonths(date,wm),notes:(oldW&&oldW.notes)||'נוצר מקבלה של הוצאה',receipts:draftReceipts,fromExpense:ref.id,createdAt:oldW?oldW.createdAt||Date.now():Date.now(),createdBy:oldW?(oldW.createdBy||''):(S.uid||''),updatedAt:Date.now(),updatedBy:S.uid||''})}catch(err){toast('ההוצאה נשמרה, אבל רישום האחריות נכשל')}}
+    else if(hadW){try{await S.db.doc('adocs/'+wid).delete()}catch(err){}}
+    if(old&&S.assets){(old.receipts||[]).filter(r=>!draftReceipts.some(d=>d.id===r.id)).forEach(r=>[r.id,r.preview].filter(Boolean).filter(id=>assetFree(id,old)).forEach(id=>S.assets.delete(id).catch(()=>{})))}
     freshUploads=[];closeSheet();toast(old?'ההוצאה עודכנה':'ההוצאה נשמרה');if(!old){$('#e-month').value=date.slice(0,7);renderExp()}}
   catch(err){btn.disabled=false;showErr(err&&err.code==='quota_exceeded'?'מאגר הנתונים מלא. יש למחוק הוצאות ישנות.':'השמירה נכשלה. בדקו חיבור ונסו שוב.')}}
 $('#fab').addEventListener('click',()=>openExpense(null));
@@ -673,7 +685,7 @@ async function confirmInternal(){
 const SC={src:null,W:0,H:0,q:null,rot:0,mode:'doc',pdf:true,free:false,warped:null,final:null,view:null,drag:null};
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 async function uploadReady(blob,type,name,preview){const btn=$('#f-save');if(btn)btn.disabled=true;
-  try{if(!S.assets)throw new Error('אין חיבור לשמירת קבצים');toast('מעלה קבלה…');const r=await S.assets.upload(blob,{type});freshUploads.push(r.id);let pid='';if(preview){try{const pv=await S.assets.upload(preview,{type:'image/jpeg'});pid=pv.id;freshUploads.push(pid)}catch(e){}}draftReceipts.push(pid?{id:r.id,type:r.contentType||type,name,preview:pid}:{id:r.id,type:r.contentType||type,name});renderReceipts(false);toast('הקבלה צורפה')}
+  try{if(!S.assets)throw new Error('אין חיבור לשמירת קבצים');toast('מעלה קבלה…');const r=await S.assets.upload(blob,{type});freshUploads.push(r.id);let pid='';if(preview){try{const pv=await S.assets.upload(preview,{type:'image/jpeg'});pid=pv.id;freshUploads.push(pid)}catch(e){}}draftReceipts.push(pid?{id:r.id,type:r.contentType||type,name,preview:pid}:{id:r.id,type:r.contentType||type,name});renderReceipts(false);toast('הקבלה צורפה');if(ocrAuto())ocrRun(preview||blob,preview?'image/jpeg':type)}
   catch(err){showErr('העלאת הקבלה נכשלה: '+((err&&err.message)||err||'שגיאה לא ידועה'))}if(btn)btn.disabled=false}
 function scanOpen(file){const url=URL.createObjectURL(file),im=new Image();
   im.onload=()=>{URL.revokeObjectURL(url);const s=Math.min(1,3000/Math.max(im.naturalWidth,im.naturalHeight));
@@ -988,7 +1000,7 @@ function openKind(k,id){const K=KIND[k],e=id?kindList(k).find(x=>x.id===id):null
    <div class="calc" id="f-calc"></div>
    ${k==='fuel'?`<label class="fld">סטטוס החזר<select id="f-st"><option value="pending">ממתין להחזר</option><option value="refunded" ${e&&e.status==='refunded'?'selected':''}>הוחזר</option></select></label>`:''}
    <label class="fld">הערות<textarea id="f-notes">${esc(e?e.notes:'')}</textarea></label>
-   <div class="fld">קבלות</div><div class="receipts" id="f-rc"></div>
+   <div class="fld">קבלות</div><div class="receipts" id="f-rc"></div><div class="notice" id="ai-st" hidden></div>${ocrAvailable()&&!ro?'<button type="button" class="btn sm" id="ai-btn" style="justify-self:start">🔍 זיהוי פרטים מהקבלה</button>':''}
    ${S.assets&&!ro?`<div class="row"><span class="btn filebtn">📷 סריקת קבלה<input type="file" id="f-scan" accept="image/*" capture="environment" aria-label="סריקת קבלה"></span><span class="btn filebtn">📎 צירוף קובץ<input type="file" id="f-file" accept="image/*,application/pdf" multiple aria-label="צירוף קבלה"></span></div>`:''}
    <div class="notice warn" id="f-err" hidden></div>
    <div class="foot">${e&&!ro?'<button type="button" class="btn danger" id="f-del">מחיקה</button>':'<span></span>'}<div class="row"><button type="button" class="btn" id="k-back">חזרה לרשימה</button>${ro?'':'<button type="submit" class="btn primary" id="f-save">שמירה</button>'}</div></div>
@@ -1001,7 +1013,7 @@ function openKind(k,id){const K=KIND[k],e=id?kindList(k).find(x=>x.id===id):null
   const fi=$('#f-file');if(fi)fi.addEventListener('change',()=>uploadFiles([...fi.files]).then(()=>fi.value=''));
   $('#k-back').addEventListener('click',()=>{if(S.assets)freshUploads.forEach(x=>S.assets.delete(x).catch(()=>{}));freshUploads=[];openKindList(k)});
   const del=$('#f-del');if(del)del.addEventListener('click',async()=>{if(!(await askConfirm('למחוק את הרשומה הזו?','מחיקה')))return;
-    try{await S.db.doc(K.col+'/'+e.id).delete();for(const r of (e.receipts||[]))for(const x of [r.id,r.preview].filter(Boolean)){try{await S.assets.delete(x)}catch(_){}}toast('נמחק');openKindList(k)}catch(err){showErr('המחיקה נכשלה.')}});
+    try{await S.db.doc(K.col+'/'+e.id).delete();for(const r of (e.receipts||[]))for(const x of [r.id,r.preview].filter(Boolean)){if(!assetFree(x,e))continue;try{await S.assets.delete(x)}catch(_){}}toast('נמחק');openKindList(k)}catch(err){showErr('המחיקה נכשלה.')}});
   $('#kf').addEventListener('submit',async ev=>{ev.preventDefault();const date=$('#f-date').value,amount=$('#f-amount').value,desc=$('#f-desc').value.trim();
     if(!date)return showErr('נא לבחור תאריך.');if(!(+amount>0))return showErr('נא להזין סכום.');if(k==='other'&&!desc)return showErr('נא לכתוב תיאור להוצאה.');
     const vm=$('#f-vm').value,c=calcVat(amount,vm,S.settings.vatRate);
@@ -1010,7 +1022,7 @@ function openKind(k,id){const K=KIND[k],e=id?kindList(k).find(x=>x.id===id):null
     if(k==='fuel'){doc.status=$('#f-st').value;doc.refundedAt=doc.status==='refunded'?(e&&e.refundedAt||today()):''}
     const btn=$('#f-save');btn.disabled=true;
     try{await (e?S.db.doc(K.col+'/'+e.id):S.db.collection(K.col).doc()).set(doc);
-      if(e&&S.assets)(e.receipts||[]).filter(r=>!draftReceipts.some(d=>d.id===r.id)).forEach(r=>[r.id,r.preview].filter(Boolean).forEach(x=>S.assets.delete(x).catch(()=>{})));
+      if(e&&S.assets)(e.receipts||[]).filter(r=>!draftReceipts.some(d=>d.id===r.id)).forEach(r=>[r.id,r.preview].filter(Boolean).filter(x=>assetFree(x,e)).forEach(x=>S.assets.delete(x).catch(()=>{})));
       freshUploads=[];toast('נשמר');openKindList(k,date.slice(0,7))}
     catch(err){btn.disabled=false;showErr('השמירה נכשלה. נסו שוב.')}})}
 async function zipKind(k,list,btn,month){if(!window.JSZip){toast('רכיב ה-ZIP לא נטען. רעננו ונסו שוב.');return}if(!S.dl){toast('הורדה אינה זמינה בתצוגה זו');return}
@@ -1064,7 +1076,7 @@ function openDoc(id,scope){const d=id?S.adocs.find(x=>x.id===id):null;if(id&&!d)
     <label class="fld">בתוקף עד<input type="date" id="d-exp" value="${esc(d?d.expiry||'':'')}"></label></div>
    <div id="d-stat" class="calc"></div>
    <label class="fld">הערות<textarea id="d-notes">${esc(d?d.notes||'':'')}</textarea></label>
-   <div class="fld">קבצים</div><div class="receipts" id="f-rc"></div>
+   <div class="fld">קבצים</div><div class="receipts" id="f-rc"></div><div class="notice" id="ai-st" hidden></div>${ocrAvailable()&&!ro?'<button type="button" class="btn sm" id="ai-btn" style="justify-self:start">🔍 זיהוי פרטים מהקבלה</button>':''}
    ${S.assets&&!ro?`<div class="row"><span class="btn filebtn">📷 סריקה<input type="file" id="f-scan" accept="image/*" capture="environment" aria-label="סריקת מסמך"></span><span class="btn filebtn">📎 צירוף קובץ<input type="file" id="f-file" accept="image/*,application/pdf" multiple aria-label="צירוף קובץ"></span></div>`:''}
    <div class="notice warn" id="f-err" hidden></div>
    <div class="foot">${d&&!ro?'<button type="button" class="btn danger" id="d-del">מחיקה</button>':'<span></span>'}<div class="row"><button type="button" class="btn" id="d-back">חזרה לרשימה</button>${ro?'':'<button type="submit" class="btn primary" id="f-save">שמירה</button>'}</div></div>
@@ -1081,7 +1093,7 @@ function openDoc(id,scope){const d=id?S.adocs.find(x=>x.id===id):null;if(id&&!d)
   const fi=$('#f-file');if(fi)fi.addEventListener('change',()=>uploadFiles([...fi.files]).then(()=>fi.value=''));
   $('#d-back').addEventListener('click',()=>{if(S.assets)freshUploads.forEach(x=>S.assets.delete(x).catch(()=>{}));freshUploads=[];S.sheetView=back;renderDocs(false)});
   const del=$('#d-del');if(del)del.addEventListener('click',async()=>{if(!(await askConfirm('למחוק את המסמך הזה ואת הקבצים שלו?','מחיקה')))return;
-    try{await S.db.doc('adocs/'+d.id).delete();for(const r of (d.receipts||[]))for(const x of [r.id,r.preview].filter(Boolean)){try{await S.assets.delete(x)}catch(_){}}toast('המסמך נמחק');S.sheetView=back;renderDocs(false)}catch(err){showErr('המחיקה נכשלה.')}});
+    try{await S.db.doc('adocs/'+d.id).delete();for(const r of (d.receipts||[]))for(const x of [r.id,r.preview].filter(Boolean)){if(!assetFree(x,d))continue;try{await S.assets.delete(x)}catch(_){}}toast('המסמך נמחק');S.sheetView=back;renderDocs(false)}catch(err){showErr('המחיקה נכשלה.')}});
   $('#df').addEventListener('submit',async ev=>{ev.preventDefault();const aptId=$('#d-apt').value;if(!aptId)return showErr('נא לבחור לאיזו דירה המסמך שייך.');
     const wm=$('#d-wm').value;
     const doc={aptId,type:$('#d-type').value,date:$('#f-date').value,product:$('#d-product').value.trim(),vendor:$('#d-vendor').value.trim(),warrantyMonths:+wm||0,expiry:$('#d-exp').value,notes:$('#d-notes').value.trim(),receipts:draftReceipts,
@@ -1089,7 +1101,7 @@ function openDoc(id,scope){const d=id?S.adocs.find(x=>x.id===id):null;if(id&&!d)
     if(!doc.product&&!draftReceipts.length)return showErr('נא לכתוב מוצר / נושא או לצרף קובץ.');
     const btn=$('#f-save');btn.disabled=true;
     try{await (d?S.db.doc('adocs/'+d.id):S.db.collection('adocs').doc()).set(doc);
-      if(d&&S.assets)(d.receipts||[]).filter(r=>!draftReceipts.some(x=>x.id===r.id)).forEach(r=>[r.id,r.preview].filter(Boolean).forEach(x=>S.assets.delete(x).catch(()=>{})));
+      if(d&&S.assets)(d.receipts||[]).filter(r=>!draftReceipts.some(x=>x.id===r.id)).forEach(r=>[r.id,r.preview].filter(Boolean).filter(x=>assetFree(x,d)).forEach(x=>S.assets.delete(x).catch(()=>{})));
       freshUploads=[];toast('המסמך נשמר');S.sheetView=back.scope==='*'?back:{k:'docs',scope:aptId,filter:''};renderDocs(false)}
     catch(err){btn.disabled=false;showErr('השמירה נכשלה. נסו שוב.')}})}
 $('#a-docs').addEventListener('click',()=>openDocs('*'));
@@ -1149,6 +1161,72 @@ $('#a-import').addEventListener('click',openImport);
 
 /* ---------- about ---------- */
 {const v=$('#about-ver');if(v)v.textContent=window.APP_VERSION?'גרסה '+window.APP_VERSION:''}
+
+/* ---------- on-device text recognition (Tesseract) ---------- */
+let ocrW=null,ocrReady=null,ocrSeq=0;const ocrCb={};
+function ocrAvailable(){return !window.__noOcr&&location.protocol!=='file:'&&typeof Worker!=='undefined'&&typeof createImageBitmap!=='undefined'}
+function ocrAuto(){try{return localStorage.getItem('pinkas-ocr-auto')!=='0'}catch(e){return true}}
+function ocrCall(msg,transfer){return new Promise((ok,no)=>{const id=++ocrSeq;ocrCb[id]={ok,no};ocrW.postMessage(Object.assign({id},msg),transfer||[])})}
+function ocrInit(){if(ocrReady)return ocrReady;
+  ocrReady=(async()=>{const base=new URL('lib/',location.href).href;ocrW=new Worker(base+'ocr-worker.js');
+    ocrW.onmessage=e=>{const c=ocrCb[e.data.id];if(!c)return;delete ocrCb[e.data.id];if(e.data.ok)c.ok(e.data);else c.no(new Error(e.data.error))};
+    ocrW.onerror=()=>{Object.keys(ocrCb).forEach(k=>{ocrCb[k].no(new Error('רכיב הזיהוי נכשל'));delete ocrCb[k]})};
+    const r=await fetch(base+'tessdata/heb.traineddata');if(!r.ok)throw new Error('קובץ השפה חסר');const data=await r.arrayBuffer();
+    await ocrCall({cmd:'init',core:base+'tesseract-core-lstm.wasm.js',data},[data]);return true})();
+  ocrReady.catch(()=>{ocrReady=null;try{ocrW&&ocrW.terminate()}catch(e){}ocrW=null});return ocrReady}
+async function ocrText(blob){await ocrInit();const bmp=await createImageBitmap(blob);const L=Math.max(bmp.width,bmp.height),s=L>2400?2400/L:(L<1400?1400/L:1),w=Math.max(1,Math.round(bmp.width*s)),h=Math.max(1,Math.round(bmp.height*s));
+  const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.filter='grayscale(1)';x.drawImage(bmp,0,0,w,h);
+  const png=await new Promise(ok=>c.toBlob(ok,'image/png'));const img=await png.arrayBuffer();
+  const r=await ocrCall({cmd:'ocr',img},[img]);return r.text||''}
+function parseReceipt(t){const out={},text=String(t||'').replace(/[‎‏‪-‮]/g,''),lines=text.split(/\n/).map(l=>l.trim()).filter(Boolean),cy=new Date().getFullYear();
+  const re=/(\d{1,2})\s*[\/.\-]\s*(\d{1,2})\s*[\/.\-]\s*(\d{2,4})/g;let m;
+  while((m=re.exec(text))){let d=+m[1],mo=+m[2],y=+m[3];if(y<100)y+=2000;if(y<2000||y>cy+1||mo<1||mo>12||d<1||d>31)continue;
+    const iso=y+'-'+pad(mo)+'-'+pad(d);if(new Date(iso).getTime()>Date.now()+2*864e5)continue;out.date=iso;break}
+  const nums=s=>(s.match(/\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+\.\d{2}/g)||[]).map(v=>+v.replace(/,/g,''));
+  let amt=0;lines.forEach(l=>{if(/סה.?כ|לתשלום|סך הכל|סכום כולל|כולל מע|total/i.test(l))nums(l).forEach(v=>{if(v>amt&&v<1e6)amt=v})});
+  if(!amt)nums(text).forEach(v=>{if(v>amt&&v<1e5)amt=v});if(amt)out.amount=amt;
+  const inv=text.match(/(?:קבלה|חשבונית(?:\s*מס)?(?:\s*\/\s*קבלה)?)\s*(?:מס['׳]?|מספר)?\s*[:#]?\s*(\d{3,12})/);if(inv)out.invoiceNo=inv[1];
+  let wm=0;const w1=text.match(/אחריות[^\n\d]{0,25}(\d{1,2})\s*(שנים|שנה|חודשים|חודש)/)||text.match(/(\d{1,2})\s*(שנים|שנה|חודשים|חודש)[^\n]{0,15}אחריות/);
+  if(w1)wm=/שנ/.test(w1[2])?(+w1[1])*12:+w1[1];else if(/שנתיים[^\n]{0,15}אחריות|אחריות[^\n]{0,15}שנתיים/.test(text))wm=24;else if(/שנת אחריות|אחריות[^\n]{0,12}שנה/.test(text))wm=12;
+  if(wm&&wm<=240)out.warrantyMonths=wm;out.hasWarranty=/אחריות/.test(text);
+  out.type=/תעודת אחריות/.test(text)?'warranty':/חוזה|הסכם/.test(text)?'contract':/קבלה|חשבונית/.test(text)?'receipt':(out.hasWarranty?'warranty':'');
+  const pr=text.match(/(?:שם המוצר|שם פריט|מוצר|דגם|פריט|תיאור)\s*[:\-]\s*([^\n]{2,40})/);if(pr)out.product=pr[1].replace(/\s+/g,' ').trim();
+  const v=lines.find(l=>/[א-ת]{2,}/.test(l)&&!/קבלה|חשבונית|עוסק|ח\.?\s?פ|מע.?מ|תאריך|טלפון|טל[.:]|סה.?כ|העתק|מקור|כתובת|www|@/.test(l)&&l.replace(/[^א-תa-zA-Z]/g,'').length>=3);
+  if(v)out.vendor=v.replace(/[|_~*=<>]+/g,' ').replace(/\s+/g,' ').trim().slice(0,40);
+  return out}
+function ocrFill(x){x=x||{};let n=0;const fire=el=>{el.dispatchEvent(new Event('input'));el.dispatchEvent(new Event('change'))};
+  const put=(sel,v)=>{const el=$(sel);v=v==null?'':String(v).trim();if(!el||!v||el.value)return;el.value=v;fire(el);n++};
+  if($('#d-product')){
+    if(x.type&&DOCT[x.type]&&!$('#d-product').value)$('#d-type').value=x.type;
+    put('#d-product',x.product);put('#d-vendor',x.vendor);if(x.date){$('#f-date').value=x.date;n++}
+    const wm=x.warrantyMonths||0;if(wm){const opt=[...$('#d-wm').options].find(o=>+o.value===wm);$('#d-wm').value=opt?String(wm):'custom';if(!opt)$('#d-exp').value=addMonths($('#f-date').value,wm);fire($('#d-wm'));n++}
+    else if(x.date&&+$('#d-wm').value)fire($('#d-wm'))}
+  else if($('#f-apt')){
+    if(x.date){$('#f-date').value=x.date;n++}
+    if(x.amount&&!$('#f-amount').value){$('#f-amount').value=x.amount;$('#f-vm').value='incl';fire($('#f-amount'));fire($('#f-vm'));n++}
+    if($('#w-con')&&!$('#w-con').hidden)put('#f-con',x.vendor);put('#f-inv',x.invoiceNo);
+    if((x.warrantyMonths||x.hasWarranty)&&$('#f-war')&&!$('#f-war').checked){$('#f-war').checked=true;fire($('#f-war'));n++}
+    if(x.warrantyMonths&&$('#f-wm')){const opt=[...$('#f-wm').options].find(o=>+o.value===x.warrantyMonths);if(opt)$('#f-wm').value=String(x.warrantyMonths)}
+    put('#f-wprod',x.product)}
+  else if($('#kf')){
+    if(x.date){$('#f-date').value=x.date;n++}
+    if(x.amount&&!$('#f-amount').value){$('#f-amount').value=x.amount;fire($('#f-amount'));n++}
+    put('#f-desc',x.vendor)}
+  return n}
+async function ocrRun(blob,mime){if(!ocrAvailable()||!blob||!/^image\//.test(mime||blob.type||''))return;const st=$('#ai-st');
+  if(st){st.hidden=false;st.className='notice';st.textContent='🔍 קורא את הקבלה בתוך המכשיר… (בפעם הראשונה עשוי לקחת עד חצי דקה)'}
+  try{const t=await ocrText(blob);const n=ocrFill(parseReceipt(t));if(st&&$('#ai-st')===st){st.className='notice';st.textContent=n?'🔍 מולאו '+n+' פרטים מהקבלה. בדקו ותקנו לפני השמירה.':'🔍 לא זוהו פרטים בקבלה. אפשר למלא ידנית.'}}
+  catch(e){if(st&&$('#ai-st')===st){st.className='notice warn';st.textContent='🔍 הזיהוי האוטומטי לא הצליח: '+((e&&e.message)||e)}}}
+async function ocrFromReceipts(){const r=draftReceipts[draftReceipts.length-1];if(!r)return toast('קודם צרפו או סרקו קבלה');
+  const id=r.type==='application/pdf'?r.preview:r.id;if(!id)return toast('אפשר לזהות רק תמונות או סריקות');
+  try{ocrRun(await S.assets.fetchBlob(id),id===r.preview?'image/jpeg':r.type)}catch(e){toast('לא ניתן לקרוא את הקבלה')}}
+document.addEventListener('click',ev=>{if(ev.target&&ev.target.id==='ai-btn')ocrFromReceipts()});
+{const t=$('#ocr-auto');if(t){if(!ocrAvailable()){t.closest('.panel').hidden=true}else{t.checked=ocrAuto();t.addEventListener('change',()=>{try{localStorage.setItem('pinkas-ocr-auto',t.checked?'1':'0')}catch(e){}})}}}
+
+/* ---------- shared files between records ---------- */
+function assetFree(id,skip){const all=[].concat(S.exps||[],S.adocs||[],S.fuel||[],S.other||[]);return !all.some(x=>x!==skip&&(x.receipts||[]).some(r=>r.id===id||r.preview===id))}
+const WMS=[6,12,24,36,60,84,120];
+function wmLabel(m){return m%12?m+' חודשים':m===12?'שנה':m===24?'שנתיים':(m/12)+' שנים'}
 
 /* ---------- settings ---------- */
 let draftCats=null;
