@@ -156,7 +156,8 @@
 
   /* ---------- users ---------- */
   var names = {};
-  function displayName(u) { return (u && u.user_metadata && u.user_metadata.name) || (u && u.email) || ''; }
+  var myName = '';
+  function displayName(u) { return myName || (u && u.user_metadata && u.user_metadata.name) || (u && u.email) || ''; }
   var user = {
     id: async function () { return session ? session.user.id : null; },
     me: async function () { return { id: session.user.id, name: displayName(session.user), email: session.user.email }; },
@@ -247,7 +248,13 @@
     session = s;
     $('#login').hidden = true;
     try {
-      await sb.from(TABLE).upsert({ collection: 'users', id: s.user.id, data: { name: displayName(s.user), email: s.user.email }, updated_at: new Date().toISOString() });
+      var typed = ($('#lg-name') && $('#lg-name').value.trim()) || '';
+      var ex = await sb.from(TABLE).select('data').eq('collection', 'users').eq('id', s.user.id).maybeSingle();
+      var old = ex && ex.data && ex.data.data && ex.data.data.name;
+      if (old && old.indexOf('@') > 0) old = '';
+      myName = typed || old || '';
+      if (myName) { try { localStorage.setItem('pinkas-name', myName); } catch (e) {} }
+      await sb.from(TABLE).upsert({ collection: 'users', id: s.user.id, data: { name: myName, email: s.user.email }, updated_at: new Date().toISOString() });
     } catch (e) {}
     try { sb.channel('docs-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: TABLE }, function (p) {
@@ -261,7 +268,14 @@
   window.Backend = {
     dashboardUrl: DASHBOARD,
     signOut: async function () { try { await sb.auth.signOut(); } catch (e) {} location.reload(); },
-    email: function () { return session ? session.user.email : ''; }
+    email: function () { return session ? session.user.email : ''; },
+    name: function () { return myName; },
+    setName: async function (n) {
+      myName = String(n || '').trim();
+      try { localStorage.setItem('pinkas-name', myName); } catch (e) {}
+      await sb.from(TABLE).upsert({ collection: 'users', id: session.user.id, data: { name: myName, email: session.user.email }, updated_at: new Date().toISOString() });
+      names[session.user.id] = myName;
+    }
   };
 
   document.addEventListener('visibilitychange', function () { if (!document.hidden && ready) notify(null); });

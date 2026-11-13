@@ -49,6 +49,9 @@ html,body{overflow-x:clip}
 .fld input,.fld select,.fld textarea{max-width:100%}
 .brand{row-gap:6px}.brand .sub{overflow-wrap:anywhere;min-width:0}
 .acct-btns{display:flex;gap:6px;flex-wrap:wrap;margin-inline-start:auto}
+.who-btn{background:none;border:0;padding:0;cursor:pointer;color:var(--muted);font:inherit;text-align:right}
+.who-btn:hover{color:var(--accent)}
+#wpop{z-index:67}
 </style>
 <title>פנקס הוצאות תחזוקה</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -234,6 +237,7 @@ a.btn{text-decoration:none}
 <div class="login" id="login" hidden>
   <form class="login-card" id="lg-form" novalidate>
     <h1>פנקס הוצאות תחזוקה</h1>
+    <label class="fld">שם (יוצג בפנקס)<input id="lg-name" autocomplete="name" placeholder="בכניסה הראשונה. אחר כך אפשר להשאיר ריק"></label>
     <label class="fld">מייל<input type="email" id="lg-email" autocomplete="username" inputmode="email" dir="ltr"></label>
     <label class="fld">סיסמה<input type="password" id="lg-pass" autocomplete="current-password" dir="ltr"></label>
     <button class="btn primary" id="lg-btn">כניסה</button>
@@ -268,8 +272,8 @@ a.btn{text-decoration:none}
   <header class="top">
     <div class="brand">
       <h1>פנקס הוצאות תחזוקה</h1>
-      <span class="sub" id="who"></span>
-      <span class="acct-btns"><button type="button" class="btn sm" id="app-switch" hidden>👤 החלפת משתמש</button><button type="button" class="btn sm exitbtn" id="app-exit" hidden aria-label="סגירת האפליקציה">⏻ סגירת האפליקציה</button></span>
+      <button type="button" class="sub who-btn" id="who"></button>
+      <span class="acct-btns"><button type="button" class="btn sm exitbtn" id="app-exit" hidden aria-label="סגירת האפליקציה">⏻ סגירת האפליקציה</button></span>
     </div>
     <nav class="tabs" role="tablist">
       <button role="tab" data-tab="exp" aria-selected="true">הוצאות</button>
@@ -1326,7 +1330,7 @@ function viewExpense(id){const e=S.exps.find(x=>x.id===id);if(!e)return;S.sheetV
 
 /* ---------- users ---------- */
 S.users={};
-function usersList(){return Object.entries(S.users).map(([id,u])=>({id,name:(u&&(u.email||u.name))||'משתמש'})).sort((a,b)=>a.name.localeCompare(b.name))}
+function usersList(){return Object.entries(S.users).map(([id,u])=>({id,name:(u&&(u.name||u.email))||'משתמש'})).sort((a,b)=>a.name.localeCompare(b.name))}
 
 /* ---------- reminders ---------- */
 function remindHTML(r,label){r=r||{};const us=usersList();
@@ -1420,9 +1424,17 @@ $('#app-ver').textContent='גרסה '+(window.APP_VERSION||'—');
 window.addEventListener('backend-status',ev=>{if(ev.detail.ok){setStatus('')}else{const st=$('#status');st.hidden=false;st.className='notice warn';st.innerHTML='אין חיבור לשרת. בדקו אינטרנט. אם זה נמשך, ייתכן שהשרת הושהה – <a href="'+esc((window.Backend&&Backend.dashboardUrl)||'#')+'" target="_blank" rel="noopener" style="color:inherit;font-weight:700">לחצו כאן לשחזור (Restore)</a>.'}});
 
 
-/* ---------- switch user ---------- */
-{const sw=$('#app-switch');if(sw&&window.Backend&&Backend.signOut&&!/^מחיקת/.test(($('#acc-out')||{}).textContent||'')){sw.hidden=false;
-  sw.addEventListener('click',async()=>{if(await askConfirm('להתנתק מהמשתמש '+((Backend.email&&Backend.email())||'')+' ולהיכנס עם משתמש אחר?','התנתקות'))Backend.signOut()})}}
+/* ---------- account popup (name / sign out) ---------- */
+$('#who').addEventListener('click',()=>{if(!(window.Backend&&Backend.signOut&&Backend.setName))return;let pop=$('#wpop');if(!pop){pop=document.createElement('div');pop.id='wpop';pop.className='confirm';document.body.appendChild(pop)}
+  const nm=(Backend.name&&Backend.name())||'',em=(Backend.email&&Backend.email())||'';
+  pop.innerHTML=`<div class="cf-card" role="dialog" aria-modal="true"><p>👤 ${esc(nm||em)}</p>${nm?`<div class="num" dir="ltr" style="text-align:right;color:var(--muted)">${esc(em)}</div>`:''}
+   <label class="fld">השם שמוצג בפנקס<input id="w-name" value="${esc(nm)}" placeholder="השם שלך"></label>
+   <div class="row"><button type="button" class="btn" id="w-save">שמירת השם</button></div>
+   <button type="button" class="btn danger-fill" id="w-out">התנתקות / החלפת משתמש</button>
+   <div class="row" style="justify-content:flex-start"><button type="button" class="btn" id="w-close">סגירה</button></div></div>`;pop.hidden=false;
+  const close=()=>{pop.hidden=true};$('#w-close').addEventListener('click',close);pop.onclick=ev=>{if(ev.target===pop)close()};
+  $('#w-save').addEventListener('click',async()=>{const v=$('#w-name').value.trim();if(!v)return toast('כתבו שם');try{await Backend.setName(v);if(S.uid)S.names[S.uid]=v;$('#who').textContent='👤 '+v;toast('השם נשמר');close()}catch(e){toast('השמירה נכשלה')}});
+  $('#w-out').addEventListener('click',async()=>{close();if(await askConfirm('להתנתק מהמשתמש '+(nm||em)+' ולהיכנס עם משתמש אחר?','התנתקות'))Backend.signOut()})});
 /* ---------- exit button ---------- */
 (function(){const b=$('#app-exit');if(!b)return;const C=window.Capacitor,native=!!(C&&C.isNativePlatform&&C.isNativePlatform());let pwa=false;try{pwa=matchMedia('(display-mode: standalone)').matches}catch(e){}
   if(!native&&!pwa)return;b.hidden=false;
@@ -1438,7 +1450,7 @@ renderExp();applyWrite();
   S.db=db;S.user=user;S.assets=assets;S.dl=dl;
   if(!db){setStatus('לא ניתן להתחבר לשרת.',true);S.canWrite=false;applyWrite();return}
   if(user){try{S.uid=await user.id()}catch(e){}try{const c=await user.can('data.write');if(c===false)S.canWrite=false}catch(e){}
-    try{const me=await user.me();if(me&&(me.email||me.name)){$('#who').textContent='מחובר: '+(me.email||me.name);$('#acc-who').textContent='מחובר בתור '+(me.email||me.name)}}catch(e){}}
+    try{const me=await user.me();if(me&&(me.email||me.name)){$('#who').textContent='👤 '+(me.name||me.email);$('#acc-who').textContent='מחובר בתור '+(me.email||me.name)}}catch(e){}}
   if(!S.canWrite)setStatus('צפייה בלבד – אין לך הרשאה לרשום הוצאות בדף זה.');
   applyWrite();
   const timer=setTimeout(()=>{if(!(S.loaded.a&&S.loaded.e))setStatus('לא מצליח להגיע לנתונים כרגע. ייתכן שהמידע המוצג אינו עדכני.',true)},10000);
