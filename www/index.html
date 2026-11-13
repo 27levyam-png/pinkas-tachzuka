@@ -14,7 +14,7 @@
 @media (prefers-reduced-motion:no-preference){#splash .cover{animation:spCover 1.1s cubic-bezier(.2,.7,.2,1) both}#splash svg{animation:spIn .6s ease both}}
 @keyframes spCover{from{transform:scaleY(-1.9)}to{transform:scaleY(1)}}
 @keyframes spIn{from{transform:translateY(10px) scale(.96);opacity:0}to{transform:none;opacity:1}}
-.exitbtn{color:var(--danger);margin-inline-start:auto}
+.exitbtn{color:var(--danger)}
 #e-extra{color:var(--muted);font-size:.88rem;margin-top:-6px}
 #e-extra:empty{display:none}
 .chip.bad{background:var(--danger-bg);color:var(--danger)}
@@ -43,6 +43,12 @@ button.bld-h .chev{color:var(--muted);transition:transform .15s}button.bld-h[ari
 .note-items{display:grid;gap:2px}.note-it{cursor:pointer}.it-done{text-decoration:line-through;color:var(--muted)}
 .n-row{flex-wrap:nowrap}.n-row input[data-it]{min-height:36px}
 .rm-sn{width:auto;min-height:32px;padding:4px 8px;font-size:.88rem}
+html,body{overflow-x:clip}
+.grid-f{grid-template-columns:repeat(auto-fill,minmax(min(170px,100%),1fr))}
+.grid-f>*,.two>*,.row>*,.fld,.panel>*,.list>*,section.view>*{min-width:0}
+.fld input,.fld select,.fld textarea{max-width:100%}
+.brand{row-gap:6px}.brand .sub{overflow-wrap:anywhere;min-width:0}
+.acct-btns{display:flex;gap:6px;flex-wrap:wrap;margin-inline-start:auto}
 </style>
 <title>פנקס הוצאות תחזוקה</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -263,7 +269,7 @@ a.btn{text-decoration:none}
     <div class="brand">
       <h1>פנקס הוצאות תחזוקה</h1>
       <span class="sub" id="who"></span>
-      <button type="button" class="btn sm exitbtn" id="app-exit" hidden aria-label="יציאה מהאפליקציה">✕ יציאה</button>
+      <span class="acct-btns"><button type="button" class="btn sm" id="app-switch" hidden>👤 החלפת משתמש</button><button type="button" class="btn sm exitbtn" id="app-exit" hidden aria-label="סגירת האפליקציה">⏻ סגירת האפליקציה</button></span>
     </div>
     <nav class="tabs" role="tablist">
       <button role="tab" data-tab="exp" aria-selected="true">הוצאות</button>
@@ -424,7 +430,7 @@ function armConfirm(btn,label,fn){btn.addEventListener('click',()=>{if(btn.class
   btn._orig=btn.textContent;btn.textContent=label;btn.classList.add('armed');setTimeout(()=>{if(btn.classList.contains('armed')){btn.classList.remove('armed');btn.textContent=btn._orig}},4000)})}
 
 /* ---------- tabs ---------- */
-function showTab(t){S.tab=t;$$('nav.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));
+function showTab(t){S.tab=t;try{window.scrollTo({left:0,top:0})}catch(e){window.scrollTo(0,0)}$$('nav.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));
   ['exp','apt','rep','notes','set'].forEach(v=>$('#v-'+v).hidden=v!==t);if(t==='notes')renderNotes();$('#fab').hidden=!(t==='exp'&&S.canWrite);
   if(t==='rep')renderRep();if(t==='set')renderSet();if(t==='apt')renderApts();if(t==='exp')renderExp()}
 $$('nav.tabs button').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.tab)));
@@ -1414,6 +1420,9 @@ $('#app-ver').textContent='גרסה '+(window.APP_VERSION||'—');
 window.addEventListener('backend-status',ev=>{if(ev.detail.ok){setStatus('')}else{const st=$('#status');st.hidden=false;st.className='notice warn';st.innerHTML='אין חיבור לשרת. בדקו אינטרנט. אם זה נמשך, ייתכן שהשרת הושהה – <a href="'+esc((window.Backend&&Backend.dashboardUrl)||'#')+'" target="_blank" rel="noopener" style="color:inherit;font-weight:700">לחצו כאן לשחזור (Restore)</a>.'}});
 
 
+/* ---------- switch user ---------- */
+{const sw=$('#app-switch');if(sw&&window.Backend&&Backend.signOut&&!/^מחיקת/.test(($('#acc-out')||{}).textContent||'')){sw.hidden=false;
+  sw.addEventListener('click',async()=>{if(await askConfirm('להתנתק מהמשתמש '+((Backend.email&&Backend.email())||'')+' ולהיכנס עם משתמש אחר?','התנתקות'))Backend.signOut()})}}
 /* ---------- exit button ---------- */
 (function(){const b=$('#app-exit');if(!b)return;const C=window.Capacitor,native=!!(C&&C.isNativePlatform&&C.isNativePlatform());let pwa=false;try{pwa=matchMedia('(display-mode: standalone)').matches}catch(e){}
   if(!native&&!pwa)return;b.hidden=false;
