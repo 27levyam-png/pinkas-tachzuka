@@ -42,6 +42,7 @@ button.bld-h .chev{color:var(--muted);transition:transform .15s}button.bld-h[ari
 .note.is-done{opacity:.65}.note-h{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap}.note-b{white-space:pre-wrap;color:var(--muted);font-size:.95rem}
 .note-items{display:grid;gap:2px}.note-it{cursor:pointer}.it-done{text-decoration:line-through;color:var(--muted)}
 .n-row{flex-wrap:nowrap}.n-row input[data-it]{min-height:36px}
+.rm-sn{width:auto;min-height:32px;padding:4px 8px;font-size:.88rem}
 </style>
 <title>פנקס הוצאות תחזוקה</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -999,7 +1000,6 @@ async function runBackup(btn){
     for(const d of S.adocs){const folder=folderOf(d)+'/מסמכים';for(const r of (d.receipts||[])){btn.textContent='מוריד מסמכים…';const base=safe((DOCT[d.type]||'מסמך')+' '+(d.product||'')+' '+fdate(d.date).replace(/\//g,'-')),ext=extOf(r.type);let name=base+'.'+ext,n=2;while(used.has(folder+'/'+name))name=base+' ('+(n++)+').'+ext;used.add(folder+'/'+name);
       try{root.file(folder+'/'+name,await S.assets.fetchBlob(r.id))}catch(err){missing.push(folder+'/'+name)}}}
     if(S.adocs.length)root.file('מסמכים ואחריות.csv',csvText(['שייך ל','סוג','מוצר / נושא','ספק','תאריך','בתוקף עד','מצב','הערות'],S.adocs.map(d=>{const st=docStatus(d);return[aptLabel(d),DOCT[d.type]||'',d.product,d.vendor,fdate(d.date),fdate(d.expiry),st?st.txt:'',d.notes]})));
-    if(S.notes.length)root.file('פתקים.csv',csvText(['כותרת','טקסט','רשימה','שיוך','תזכורת','הושלם'],S.notes.map(n=>[n.title,n.body,(n.items||[]).map(i=>(i.done?'✓ ':'• ')+i.t).join(' | '),n.aptId?aptLabel(n):'',n.remind&&n.remind.date?fdate(n.remind.date):'',n.done?'כן':''])));
     root.file('הוצאות.csv',csvText(['תאריך','כתובת / בניין','דירה ודייר','סוג הוצאה','מהות העבודה','בעל מקצוע','מס חשבונית','נטו','מעמ','סהכ','סטטוס','תאריך החזר','הערות','קבצי קבלות'],
       exps.map(e=>[fdate(e.date),bldOf(e),aptShort(e),e.category,e.description,e.contractor,e.invoiceNo,e.net,e.vat,e.gross,e.status==='refunded'?'הוחזר':'ממתין להחזר',fdate(e.refundedAt),e.notes,(paths.get(e.id)||[]).join(' | ')])));
     root.file('דירות.csv',csvText(['בניין','דירה','יחידה','קומה','דייר','טלפון','טלפון נוסף','מונה מים','מונה חשמל','חוזה חשמל','מונה גז','מונה מים משני','מונה חשמל משני','הערות'],
@@ -1328,28 +1328,30 @@ function remindHTML(r,label){r=r||{};const us=usersList();
    <div id="rm-box" class="list" ${r.date?'':'hidden'}><div class="two"><label class="fld">מתי להזכיר<input type="date" id="rm-date" value="${esc(r.date||'')}"></label><label class="fld">מה להזכיר (לא חובה)<input id="rm-note" value="${esc(r.note||'')}"></label></div>
    <div class="fld" style="color:var(--muted);font-weight:600;font-size:.85rem">למי תקפוץ התזכורת</div>
    <div class="rm-users">${us.length?us.map(u=>`<label class="scan-pdf"><input type="checkbox" class="rm-u" value="${esc(u.id)}" ${!r.users||!r.users.length||r.users.includes(u.id)?'checked':''}> ${esc(u.name)}${u.id===S.uid?' (אני)':''}</label>`).join(''):'<span style="color:var(--muted);font-size:.88rem">התזכורת תקפוץ לכל מי שמשתמש בפנקס</span>'}</div>
-   <div style="color:var(--muted);font-size:.82rem">התזכורת קופצת כשהמשתמש שנבחר פותח את הפנקס, מהתאריך שנקבע ועד שמסמנים "טופל".</div></div></div>`}
+   <div style="color:var(--muted);font-size:.82rem">התזכורת קופצת כשהמשתמש שנבחר פותח את הפנקס, מהתאריך שנקבע. בתזכורת אפשר לבחור "להזכיר שוב בעוד…". תזכורת של חוזה נסגרת לבד כשמועלה חוזה חדש לאותה דירה.</div></div></div>`}
 function remindBind(defDate){const on=$('#rm-on');if(!on)return;on.addEventListener('change',()=>{$('#rm-box').hidden=!on.checked;if(on.checked&&!$('#rm-date').value)$('#rm-date').value=(defDate&&defDate())||today()})}
 function remindRead(prev){const on=$('#rm-on');if(!on||!on.checked||!$('#rm-date').value)return null;const all=$$('.rm-u'),sel=all.filter(x=>x.checked).map(x=>x.value);
   const r={date:$('#rm-date').value,note:$('#rm-note').value.trim(),users:sel.length===all.length?[]:sel,done:{},snooze:{}};
   if(prev&&prev.date===r.date){r.done=prev.done||{};r.snooze=prev.snooze||{}}return r}
 const RKEY=()=>S.uid||'all';
+function contractReplaced(d){return S.adocs.some(x=>x!==d&&x.type==='contract'&&x.aptId===d.aptId&&(x.unitId||'')===(d.unitId||'')&&((x.createdAt||0)>(d.createdAt||0)))}
+const SNOOZE=[[1,'יום'],[2,'יומיים'],[3,'3 ימים'],[4,'4 ימים'],[5,'5 ימים'],[7,'שבוע'],[14,'שבועיים'],[21,'3 שבועות'],[28,'4 שבועות']];
 function dueReminders(){const t=today(),u=RKEY(),out=[];
   const chk=(r,kind,obj,title)=>{if(!r||!r.date)return;if(r.users&&r.users.length&&S.uid&&!r.users.includes(S.uid))return;if(r.done&&r.done[u])return;const sn=r.snooze&&r.snooze[u];if((sn&&sn>t)||r.date>t)return;out.push({kind,obj,title,r})};
-  S.adocs.forEach(d=>chk(d.remind,'doc',d,(DOCT[d.type]||'מסמך')+(d.product?': '+d.product:'')+' · '+aptLabel(d)));
+  S.adocs.forEach(d=>{if(d.type==='contract'&&contractReplaced(d))return;chk(d.remind,'doc',d,(DOCT[d.type]||'מסמך')+(d.product?': '+d.product:'')+' · '+aptLabel(d))});
   (S.notes||[]).forEach(n=>{if(!n.done)chk(n.remind,'note',n,'📝 '+(n.title||'פתק'))});return out}
 let remT=null;S.remShown=new Set();
 function checkReminders(force){clearTimeout(remT);remT=setTimeout(()=>{const due=dueReminders().filter(x=>force||!S.remShown.has(x.kind+x.obj.id));if(due.length)showReminders(due)},1500)}
 function showReminders(list){let pop=$('#rpop');if(!pop){pop=document.createElement('div');pop.id='rpop';pop.className='confirm';document.body.appendChild(pop)}
   list.forEach(x=>S.remShown.add(x.kind+x.obj.id));
   pop.innerHTML=`<div class="cf-card" role="dialog" aria-modal="true"><p>⏰ תזכורות</p><div class="list">${list.map((x,i)=>`<div class="rm-item"><b>${esc(x.title)}</b>${x.r.note?`<div>${esc(x.r.note)}</div>`:''}<div style="color:var(--muted);font-size:.85rem">מתאריך ${esc(fdate(x.r.date))}</div>
-    <div class="row"><button type="button" class="btn sm" data-ro="${i}">פתיחה</button><button type="button" class="btn sm" data-rs="${i}">תזכיר מחר</button>${S.canWrite?`<button type="button" class="btn sm primary" data-rd="${i}">✓ טופל</button>`:''}</div></div>`).join('')}</div>
+    <div class="row"><button type="button" class="btn sm" data-ro="${i}">פתיחה</button><select class="rm-sn" data-rs="${i}" aria-label="להזכיר שוב"><option value="">להזכיר שוב בעוד…</option>${SNOOZE.map(([d,l])=>`<option value="${d}">${l}</option>`).join('')}</select>${x.kind==='note'&&S.canWrite?`<button type="button" class="btn sm primary" data-rd="${i}">✓ בוצע</button>`:''}</div>${x.kind==='doc'?'<div style="color:var(--muted);font-size:.82rem">התזכורת תיסגר לבד כשיועלה חוזה חדש לאותה דירה.</div>':''}</div>`).join('')}</div>
     <div class="row" style="justify-content:flex-start"><button type="button" class="btn" id="rp-close">סגירה</button></div></div>`;pop.hidden=false;
   const close=()=>{pop.hidden=true};$('#rp-close').addEventListener('click',close);pop.onclick=ev=>{if(ev.target===pop)close()};
   const upd=async(x,patch)=>{const r=Object.assign({},x.r,patch);try{await S.db.doc((x.kind==='doc'?'adocs/':'notes/')+x.obj.id).update({remind:r})}catch(e){toast('העדכון נכשל')}};
   const after=b=>{const it=b.closest('.rm-item');it.remove();if(!pop.querySelector('.rm-item'))close()};
   pop.querySelectorAll('[data-ro]').forEach(b=>b.addEventListener('click',()=>{const x=list[+b.dataset.ro];close();if(x.kind==='doc')openDoc(x.obj.id);else{showTab('notes');openNote(x.obj.id)}}));
-  pop.querySelectorAll('[data-rs]').forEach(b=>b.addEventListener('click',()=>{const x=list[+b.dataset.rs],d=new Date();d.setDate(d.getDate()+1);const tm=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());upd(x,{snooze:Object.assign({},x.r.snooze,{[RKEY()]:tm})});after(b)}));
+  pop.querySelectorAll('[data-rs]').forEach(b=>b.addEventListener('change',()=>{if(!b.value)return;const x=list[+b.dataset.rs],d=new Date();d.setDate(d.getDate()+(+b.value));const tm=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());upd(x,{snooze:Object.assign({},x.r.snooze,{[RKEY()]:tm})});after(b)}));
   pop.querySelectorAll('[data-rd]').forEach(b=>b.addEventListener('click',()=>{const x=list[+b.dataset.rd];upd(x,{done:Object.assign({},x.r.done,{[RKEY()]:true})});after(b)}))}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){S.remShown=new Set();checkReminders()}});
 
@@ -1360,9 +1362,9 @@ function renderNotes(){const el=$('#n-list');if(!el)return;const f=S.noteFilter;
   let list=S.notes.slice();if(f==='open')list=list.filter(n=>!n.done);else if(f==='done')list=list.filter(n=>n.done);
   list.sort((a,b)=>(a.done?1:0)-(b.done?1:0)||(b.updatedAt||0)-(a.updatedAt||0));
   $$('#v-notes [data-nf]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.nf===f));
-  if(!list.length){el.innerHTML=`<div class="empty"><b>${S.notes.length?'אין פתקים בסינון הזה':'עדיין אין פתקים'}</b>פתק יכול להיות תזכורת, רשימת דברים לתקן בדירה, או כל רשימה אחרת. אפשר לשייך אותו לדירה ולהגדיר תזכורת.</div>`;return}
+  if(!list.length){el.innerHTML=`<div class="empty"><b>${S.notes.length?'אין פתקים בסינון הזה':'עדיין אין פתקים'}</b>פתק יכול לשמש כתוכנית עבודה, רשימת דברים לתקן או תזכורת אישית.</div>`;return}
   el.innerHTML=list.map(n=>{const items=n.items||[],dn=items.filter(i=>i.done).length;
-    return `<div class="note ${n.done?'is-done':''}" data-nid="${esc(n.id)}"><div class="note-h"><b>${esc(n.title||'פתק')}</b><span class="chips">${n.aptId?`<span class="chip">${esc(aptLabel(n))}</span>`:''}${items.length?`<span class="chip">${dn}/${items.length}</span>`:''}${noteRemChip(n)}${n.done?'<span class="chip done">הושלם</span>':''}</span></div>
+    return `<div class="note ${n.done?'is-done':''}" data-nid="${esc(n.id)}"><div class="note-h"><b>${esc(n.title||'פתק')}</b><span class="chips">${items.length?`<span class="chip">${dn}/${items.length}</span>`:''}${noteRemChip(n)}${n.done?'<span class="chip done">הושלם</span>':''}</span></div>
       ${n.body?`<div class="note-b">${esc(n.body)}</div>`:''}
       ${items.length?`<div class="note-items">${items.slice(0,8).map((it,i)=>`<label class="scan-pdf note-it ${it.done?'it-done':''}"><input type="checkbox" data-ni="${i}" ${it.done?'checked':''} ${S.canWrite?'':'disabled'}> ${esc(it.t)}</label>`).join('')}${items.length>8?`<div style="color:var(--muted);font-size:.85rem">ועוד ${items.length-8}…</div>`:''}</div>`:''}</div>`}).join('');
   el.querySelectorAll('.note').forEach(c=>{c.addEventListener('click',ev=>{if(ev.target.closest('.note-it'))return;openNote(c.dataset.nid)});
@@ -1370,12 +1372,10 @@ function renderNotes(){const el=$('#n-list');if(!el)return;const f=S.noteFilter;
       try{await S.db.doc('notes/'+n.id).update({items,updatedAt:Date.now()})}catch(e){toast('העדכון נכשל')}}))})}
 function openNote(id){const n=id?S.notes.find(x=>x.id===id):null;if(id&&!n)return;const ro=!S.canWrite;S.sheetView=null;let items=n?(n.items||[]).map(x=>Object.assign({},x)):[];
   openSheet(`<h2>${n?'עריכת פתק':'פתק חדש'}</h2><form id="nf" class="list" novalidate>
-   <label class="fld">כותרת<input id="n-title" value="${esc(n?n.title||'':'')}" placeholder="לדוגמה: דברים לתקן בדירה 4"></label>
+   <label class="fld">כותרת<input id="n-title" value="${esc(n?n.title||'':'')}" placeholder="לדוגמה: תוכנית עבודה לשבוע"></label>
    <label class="fld">טקסט<textarea id="n-body">${esc(n?n.body||'':'')}</textarea></label>
    <div class="fld">רשימה</div><div id="n-items" class="list"></div>
    ${ro?'':'<div class="row"><input id="n-new" placeholder="פריט חדש לרשימה" style="flex:1 1 180px;width:auto"><button type="button" class="btn" id="n-add">הוספה</button></div>'}
-   <label class="fld">שיוך לדירה (לא חובה)<select id="d-apt">${aptOptions(n?n.aptId||'':'').replace('— בחרו דירה —','ללא שיוך')}</select></label>
-   <label class="fld" id="w-dunit" hidden>יחידה בדירה המחולקת<select id="d-unit"></select></label>
    ${remindHTML(n&&n.remind,'תזכורת לפתק')}
    <label class="scan-pdf"><input type="checkbox" id="n-done" ${n&&n.done?'checked':''}> הפתק הושלם</label>
    <div class="notice warn" id="f-err" hidden></div>
@@ -1386,13 +1386,13 @@ function openNote(id){const n=id?S.notes.find(x=>x.id===id):null;if(id&&!n)retur
     $$('#n-items [data-ix]').forEach(c=>c.addEventListener('click',()=>{items.splice(+c.dataset.ix,1);drawItems()}))};drawItems();
   const addIt=()=>{const v=$('#n-new').value.trim();if(!v)return;items.push({t:v,done:false});$('#n-new').value='';drawItems();$('#n-new').focus()};
   if($('#n-add')){$('#n-add').addEventListener('click',addIt);$('#n-new').addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();addIt()}})}
-  bindUnitSel($('#d-apt'),$('#w-dunit'),$('#d-unit'),n?n.unitId||'':'');remindBind();
+  remindBind();
   if(ro)$$('#nf input,#nf select,#nf textarea').forEach(i=>i.disabled=true);
   $('#n-cancel').addEventListener('click',closeSheet);
   const del=$('#n-del');if(del)del.addEventListener('click',async()=>{if(!(await askConfirm('למחוק את הפתק?','מחיקה')))return;try{await S.db.doc('notes/'+n.id).delete();closeSheet();toast('הפתק נמחק')}catch(e){showErr('המחיקה נכשלה.')}});
   $('#nf').addEventListener('submit',async ev=>{ev.preventDefault();const title=$('#n-title').value.trim(),body=$('#n-body').value.trim();items=items.filter(i=>String(i.t||'').trim());
     if(!title&&!body&&!items.length)return showErr('כתבו כותרת, טקסט או פריט ברשימה.');
-    const d={title,body,items,aptId:$('#d-apt').value,unitId:$('#w-dunit').hidden?'':$('#d-unit').value,remind:remindRead(n&&n.remind),done:$('#n-done').checked,
+    const d={title,body,items,remind:remindRead(n&&n.remind),done:$('#n-done').checked,
       createdAt:n?n.createdAt||Date.now():Date.now(),createdBy:n?(n.createdBy||''):(S.uid||''),updatedAt:Date.now(),updatedBy:S.uid||''};
     $('#n-save').disabled=true;try{await (n?S.db.doc('notes/'+n.id):S.db.collection('notes').doc()).set(d);closeSheet();toast('הפתק נשמר')}catch(e){$('#n-save').disabled=false;showErr('השמירה נכשלה. נסו שוב.')}})}
 $('#n-add-note').addEventListener('click',()=>openNote(null));
